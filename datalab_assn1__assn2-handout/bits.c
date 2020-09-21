@@ -277,7 +277,6 @@ unsigned float_i2f(int x) {
 
     if (x == 0) {
         return 0;
-
     } else if (x == 0x80000000) {
         return 0xcf000000;
     } else {
@@ -292,7 +291,7 @@ unsigned float_i2f(int x) {
         x <<= (31 - E);
         frac = 0x7FFFFF & (x >> 8);
 
-        sticky = x & 0xFF;
+        sticky = x & 0x7F;
         guard = x & 0x100;
         round = x & 0x80;
         if ((round && sticky) || (guard && round && !sticky)) {
@@ -331,3 +330,4 @@ unsigned float_twice(unsigned uf) {
         return (sign | uf << 1);
     }
 }
+
