@@ -2,12 +2,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <getopt.h>
-
-
-
+#include <stdlib.h>
 
 typedef struct {
-    bool valid_bit;
+    long long int updated_at;
+    bool is_empty;
     int tag;
 } Line;
 
@@ -15,19 +14,24 @@ typedef struct {
     Line * lines;
 } Set;
 
+const int m = sizeof(long) * 8; 
+// const int m = 32;
+Set *sets;
+int t_bits = 0;
+int s_bits = 0;
+int line_number;  
+int total_set = 0;
+int b_bits = 0;
+int B = 0;
+int hits = 0;
+int misses = 0;
+int evcitions = 0;
+long long int tick = 0;
 
+void access_cache(unsigned address);
 
 int main(int argc, char *argv[])
 {
-    Set *sets;
-    int line_number;
-    int s_bits = 0;
-    int total_set = 0;
-    int b_bits = 0;
-    int B = 0;
-    int hits = 0;
-    int misses = 0;
-    int evcitions = 0;
     FILE *file;
 
     int c;
@@ -37,10 +41,10 @@ int main(int argc, char *argv[])
             case 's':
                 s_bits = atoi(optarg);
                 if(!s_bits) return 0;
-                total_set = 2<<s_bits;
+                total_set = 2 << s_bits;
                 break;
             case 'E':
-                total_set = atoi(optarg);
+                line_number = atoi(optarg);
                 if(!total_set) return 0;
                 break;
             case 'b':
@@ -55,22 +59,75 @@ int main(int argc, char *argv[])
                 return 0;
         }
     }
+    t_bits = m - s_bits - b_bits;
+    printf("%d\n", t_bits);
     sets = malloc(sizeof(Set) * total_set);
+    for(int i = 0; i < line_number; i++){
+        sets[i].lines = malloc(sizeof(Line) * line_number);
+        sets[i].lines->is_empty = true;
+    }
+        
+        
 
     char operation;
-    int address;
-    while (fscanf(file, "%c %p", &operation, &address) != EOF) {
-        printf("%c %p", operation, address);
-      // Ignore instruction load
-      if (operation == 'I')  continue; 
-  
-    //   simulate(addr);
-      if (operation == 'M') break;
+    unsigned address;
+    int size;
+    while (fscanf(file, " %c %x,%d", &operation, &address, &size) != EOF) {
+        tick++;
+        if (operation == 'I')  continue; 
+        printf("called\n");
+        access_cache(address);
+        if (operation == 'M'){
+            access_cache(address);
+        };
     }
     
 
-    printSummary(0, 0, 0);
+    printSummary(hits, misses, evcitions);
     fclose(file);
+    for(int i = 0; i < total_set; i++) free(sets[i].lines);
     free(sets);
     return 0;
+}
+
+void access_cache(unsigned address){
+    int tag = address >> (s_bits + b_bits);
+	int set_index = (address << t_bits) >> (t_bits + b_bits);
+    int miss_index = -1;
+    int eviction_index = 0;
+    Set *selected_set = &sets[set_index];
+
+    for(int i = 0; i < line_number; i++){
+    printf("1\n");
+        if(!selected_set->lines[i].is_empty && selected_set->lines[i].tag == tag){
+            hits++;
+            selected_set->lines[i].updated_at = tick;
+            return;
+        }
+    printf("2\n");
+        if(miss_index == -1 && selected_set->lines[i].is_empty)
+            miss_index = i;
+    printf("3\n");
+        if(i > 0 && !selected_set->lines[i].is_empty &&
+         selected_set->lines[eviction_index].updated_at > selected_set->lines[i].updated_at)
+            eviction_index = i;
+    }
+    printf("123\n");
+    misses++;
+    if(miss_index !=-1){
+        selected_set->lines[miss_index].is_empty = false;
+        selected_set->lines[miss_index].tag = tag;
+        selected_set->lines[miss_index].updated_at = tick;
+        return;
+    }
+    printf("456\n");
+    ++evcitions;
+    selected_set->lines[eviction_index].is_empty = false;
+    selected_set->lines[eviction_index].tag = tag;
+    tick -= selected_set->lines[eviction_index].updated_at;
+    for(int i = 0; i < line_number; i++){
+        selected_set->lines[i].updated_at -= selected_set->lines[eviction_index].updated_at; 
+    }
+    selected_set->lines[eviction_index].updated_at = tick;
+    return;
 }
