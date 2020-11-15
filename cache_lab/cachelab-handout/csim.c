@@ -14,8 +14,7 @@ typedef struct {
     Line * lines;
 } Set;
 
-const int m = sizeof(long) * 8; 
-// const int m = 32;
+const int m = 32;
 Set *sets;
 int t_bits = 0;
 int s_bits = 0;
