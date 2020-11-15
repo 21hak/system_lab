@@ -24,7 +24,7 @@ int b_bits = 0;
 int B = 0;
 int hits = 0;
 int misses = 0;
-int evcitions = 0;
+int evictions = 0;
 long long int tick = 0;
 
 void access_cache(unsigned address);
@@ -59,11 +59,11 @@ int main(int argc, char *argv[])
         }
     }
     t_bits = m - s_bits - b_bits;
-    printf("%d\n", t_bits);
     sets = malloc(sizeof(Set) * total_set);
-    for(int i = 0; i < line_number; i++){
+    for(int i = 0; i < total_set; i++){
         sets[i].lines = malloc(sizeof(Line) * line_number);
-        sets[i].lines->is_empty = true;
+        for(int j = 0; j < line_number; j++)
+            sets[i].lines[j].is_empty = true;
     }
         
         
@@ -74,7 +74,6 @@ int main(int argc, char *argv[])
     while (fscanf(file, " %c %x,%d", &operation, &address, &size) != EOF) {
         tick++;
         if (operation == 'I')  continue; 
-        printf("called\n");
         access_cache(address);
         if (operation == 'M'){
             access_cache(address);
@@ -82,7 +81,7 @@ int main(int argc, char *argv[])
     }
     
 
-    printSummary(hits, misses, evcitions);
+    printSummary(hits, misses, evictions);
     fclose(file);
     for(int i = 0; i < total_set; i++) free(sets[i].lines);
     free(sets);
@@ -97,21 +96,17 @@ void access_cache(unsigned address){
     Set *selected_set = &sets[set_index];
 
     for(int i = 0; i < line_number; i++){
-    printf("1\n");
         if(!selected_set->lines[i].is_empty && selected_set->lines[i].tag == tag){
             hits++;
             selected_set->lines[i].updated_at = tick;
             return;
         }
-    printf("2\n");
         if(miss_index == -1 && selected_set->lines[i].is_empty)
             miss_index = i;
-    printf("3\n");
         if(i > 0 && !selected_set->lines[i].is_empty &&
          selected_set->lines[eviction_index].updated_at > selected_set->lines[i].updated_at)
             eviction_index = i;
     }
-    printf("123\n");
     misses++;
     if(miss_index !=-1){
         selected_set->lines[miss_index].is_empty = false;
@@ -119,8 +114,7 @@ void access_cache(unsigned address){
         selected_set->lines[miss_index].updated_at = tick;
         return;
     }
-    printf("456\n");
-    ++evcitions;
+    ++evictions;
     selected_set->lines[eviction_index].is_empty = false;
     selected_set->lines[eviction_index].tag = tag;
     tick -= selected_set->lines[eviction_index].updated_at;
