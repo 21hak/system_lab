@@ -37,7 +37,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N])
                     if (i == j) {
                         // temp = A[b_i][b_i];
                         // B[b_i][b_i] = temp;
-                         B[b_j][b_i] = A[b_i][b_j];
+                         B[b_i][b_i] = A[b_i][b_i];
                     }
                 }
             }
