@@ -22,42 +22,61 @@ int is_transpose(int M, int N, int A[N][M], int B[M][N]);
 char transpose_submit_desc[] = "Transpose submission";
 void transpose_submit(int M, int N, int A[N][M], int B[M][N])
 {   
-    int block_size = 8;
-    int temp;
+    // int block_size = 8;
+    // int temp;
+    int *t = &input[col][row + 4];
+    int a = t[0], b = t[1], c = t[2], d = t[3];
+    a = t[]
+    
 
     if (M == 32 && N == 32 ){
-        for (int i = 0; i < N; i += block_size){
-            for (int j = 0; j < M; j += block_size){
-                for (int b_i = i; b_i < i + block_size && b_i < N; ++b_i){
-                    for (int b_j = j; b_j < j + block_size && b_j < M; ++b_j){
+        for (int i = 0; i < N; i += 8){
+            for (int j = 0; j < M; j += 8){
+                for (int b_i = i; b_i < i + 8 && b_i < N; ++b_i){
+                    for (int b_j = j; b_j < j + 8 && b_j < M; ++b_j){
                         if (b_i != b_j) {
-                            temp = A[b_i][b_j];
-                            B[b_j][b_i] = temp;
+                            // temp = A[b_i][b_j];
+                            // B[b_j][b_i] = temp;
+                            B[b_j][b_i] = A[b_i][b_j];
                         } 
                     }
                     if (i == j) {
-                        temp = A[b_i][b_i];
-                        B[b_i][b_i] = temp;
+                        // temp = A[b_i][b_i];
+                        // B[b_i][b_i] = temp;
+                         B[b_j][b_i] = A[b_i][b_j];
                     }
                 }
             }
         }
     } 
     else if (M == 64 && N == 64) {
-        for (int i = 0; i < N; i += block_size){
-            for (int j = 0; j < M; j += block_size){
+        for (int i = 0; i < N; i += 8){
+            for (int j = 0; j < M; j += 8){
                 for (int k = 0; k < 8; k++) {
                     int *t = &A[j + k][i];
                     int a = t[0], b = t[1], c = t[2], d = t[3];
                     t = &B[i][j + k];
                     t[0] = a; t[64] = b; t[128] = c; t[192] = d;
                 }
-                for (int k = 7; k >= 0; k--) {
+
+                for (int k = 4; k < 8; k++) {
                     int *t = &A[j + k][i + 4];
                     int a = t[0], b = t[1], c = t[2], d = t[3];
                     t = &B[i + 4][j + k];
                     t[0] = a; t[64] = b; t[128] = c; t[192] = d;
                 }
+                for (int k = 0; k < 4; k++) {
+                    int *t = &A[j + k][i + 4];
+                    int a = t[0], b = t[1], c = t[2], d = t[3];
+                    t = &B[i + 4][j + k];
+                    t[0] = a; t[64] = b; t[128] = c; t[192] = d;
+                }
+                // for (int k = 7; k >= 0; k--) {
+                //     int *t = &A[j + k][i + 4];
+                //     int a = t[0], b = t[1], c = t[2], d = t[3];
+                //     t = &B[i + 4][j + k];
+                //     t[0] = a; t[64] = b; t[128] = c; t[192] = d;
+                // }
             }
         }
         
