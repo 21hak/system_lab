@@ -47,7 +47,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N])
         
         for (int i = 0; i < N; i += 8){
             for (int j = 0; j < M; j += 8){
-                int *t = &input[j][i + 4];
+                int *t = &A[j][i + 4];
                 int a = t[0], b = t[1], c = t[2], d = t[3];
                 for (int k = 0; k < 8; k++) {
                     int *t = &A[j + k][i];
@@ -63,7 +63,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N])
                     t = &B[i + 4][j + k];
                     t[0] = a; t[64] = b; t[128] = c; t[192] = d;
                 }
-                t = &output[i + 4][j];
+                t = &B[i + 4][j];
                 t[0] = a; t[64] = b; t[128] = c; t[192] = d;
             }
         }
