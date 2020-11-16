@@ -24,9 +24,9 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N])
 {   
     // int block_size = 8;
     // int temp;
-    int *t = &input[col][row + 4];
-    int a = t[0], b = t[1], c = t[2], d = t[3];
-    a = t[]
+    // int *t = &input[col][row + 4];
+    // int a = t[0], b = t[1], c = t[2], d = t[3];
+    // a = t[]
     
 
     if (M == 32 && N == 32 ){
