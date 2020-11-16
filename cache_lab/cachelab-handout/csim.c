@@ -117,10 +117,10 @@ void access_cache(unsigned address){
     ++evictions;
     selected_set->lines[eviction_index].is_empty = false;
     selected_set->lines[eviction_index].tag = tag;
-    tick -= selected_set->lines[eviction_index].updated_at;
-    for(int i = 0; i < line_number; i++){
-        selected_set->lines[i].updated_at -= selected_set->lines[eviction_index].updated_at; 
-    }
+    // tick -= selected_set->lines[eviction_index].updated_at;
+    // for(int i = 0; i < line_number; i++){
+    //     selected_set->lines[i].updated_at -= selected_set->lines[eviction_index].updated_at; 
+    // }
     selected_set->lines[eviction_index].updated_at = tick;
     return;
 }
