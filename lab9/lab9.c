@@ -21,5 +21,6 @@ int main(int argc, char *argv[]){
     char* execve_argv[] = {"-a"};
     char* execve_environ[] = {"0"};
 
-    execev("/bin/ls", execve_argv, execve_environ);
+    execve("/bin/ls", execve_argv, execve_environ);
+    return 0;
 }
