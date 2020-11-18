@@ -8,7 +8,6 @@ int main(){
     x = 0;
     x++;
     pid = fork();
-    printf("%d\n", pid);
     if(pid == 0){
         x++;
         printf("child PID : %ld, x : %d\n", getpid(), x);
