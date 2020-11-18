@@ -18,7 +18,7 @@
 // }
 
 int main(int argc, char *argv[]){
-    char* execve_argv[] = {"-a"};
+    char* execve_argv[] = {"-al"};
     char* execve_environ[] = {"0"};
 
     execve("/bin/ls", execve_argv, execve_environ);
