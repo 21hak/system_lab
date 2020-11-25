@@ -96,11 +96,11 @@ void eval(char *cmdline)
             app_error("NO redirection here");
         }
         // stdin redirection
-        fd = open(argv[0], O_RDONLY);
-        dup2(fd,0);
-        close(fd);
-        if(fd<0)
-            unix_error("exec error");
+        // fd = open(argv[0], O_RDONLY);
+        //dup2(fd,0);
+        //close(fd);
+        //if(fd<0)
+        //    unix_error("exec error");
         // stdout redirection
         fd2 = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, 0644);
         if(fd2<0)
