@@ -89,40 +89,14 @@ void eval(char *cmdline)
     int fd;
     int fd2;
     parseline(cmdline, argv);
-    
-    // for(int i = 0;argv[i]!='\0';i++)
-    // {
-    //     if(strcmp(argv[i],'>')==0)
-    //     {     
-    //         check = 1;
-    //     }         
-    // }
-
-
     if(argv[0] == NULL)
         return;
     
     pid = fork();
     if(pid == 0){
-        printf("0: %s\n", argv[0]);
-        printf("1: %s\n", argv[1]);
-        printf("2: %s\n", argv[2]);
         if(argv[2] == NULL){
             app_error("NO redirection here");
         }
-        // else {
-        //     int fd = open(argv[0], O_WRONLY | O_APPEND);
-        //     if(fd<0)
-        //         unix_error("exec error");
-        //     dup2(fd, 1);
-        //     close(fd);
-        //     // int fd2 = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, 0644);
-        //     // if(fd < 0 || fd2 < 0){
-        //     //     unix_error("exec error");
-        //     // }
-        //     execve(argv[0], argv, environ);
-        //     exit(1);
-        // }
         /* Child process: stdin redirection */
         fd = open(argv[0], O_RDONLY);
         close(0);
@@ -131,7 +105,7 @@ void eval(char *cmdline)
         if(fd<0)
             unix_error("exec error");
         /* Child process: stdout redirection */
-        fd2 = creat(argv[2], 0644);
+        fd2 = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, 0644);
         if(fd2<0)
             unix_error("exec error");
         close(1);
