@@ -294,11 +294,9 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {
     struct job_t* job;
-    char *op;
     pid_t pid;
-    op = argv[0];
     if(argv[1][0]  == '%'){
-        job = getjobjid(jobs, atoi(argv[1][1]));
+        job = getjobjid(jobs, atoi(&argv[1][1]));
         if(job == NULL){  
             printf("%s: No such job\n", argv[1]);  
             return;  
@@ -322,8 +320,6 @@ void do_bgfg(char **argv)
         job->state = FG;
         waitfg(job->pid);
     } 
-
-    
 
     return;
 }
