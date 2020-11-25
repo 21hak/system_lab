@@ -260,7 +260,8 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
     //jobs, bf, fg, kill
-    for(int i = 0; argv[i]!='\0';i++){
+    int i;
+    for(i = 0; argv[i]!='\0';i++){
         if(strcmp(argv[i], "jobs") == 0)
             return 1;
         if(strcmp(argv[i], "bf") == 0)
