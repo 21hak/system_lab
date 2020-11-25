@@ -295,7 +295,7 @@ void do_bgfg(char **argv)
     pid_t pid;
     op = argv[0];
     if(argv[1][0]  == '%'){
-        job = getjobjid(jobs, atoi(&argv[1][1]));
+        job = getjobjid(jobs, atoi(argv[1][1]));
         if(job == NULL){  
             printf("%s: No such job\n", argv[1]);  
             return;  
@@ -303,7 +303,7 @@ void do_bgfg(char **argv)
             pid = job->pid;
         }
     } else {
-        pid = atoi(&argv[1]);
+        pid = atoi(argv[1]);
         job = getjobpid(jobs, pid);
         if(job == NULL){  
             printf("%s: No such process\n", argv[1]);  
