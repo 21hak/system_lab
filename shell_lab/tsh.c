@@ -169,7 +169,7 @@ void eval(char *cmdline)
     char *buf[MAXLINE];
     int bg;
     pid_t pid;
-    parseline(cmdline, argv);
+    bg = parseline(cmdline, argv);
     if(argv[0] == NULL)
         return;
     if(!builtin_cmd(argv)){
@@ -262,14 +262,15 @@ int builtin_cmd(char **argv)
     //jobs, bf, fg, kill
     int i;
     for(i = 0; argv[i]!='\0';i++){
+        if(strcmp(argv[i], "quit") == 0)
+            exit(1);
         if(strcmp(argv[i], "jobs") == 0)
-            return 1;
+            listjobs(jobs);
         if(strcmp(argv[i], "bf") == 0)
             return 1;
         if(strcmp(argv[i], "fg") == 0)
             return 1;
-        if(strcmp(argv[i], "kill") == 0)
-            return 1;
+        
     }
     return 0;     /* not a builtin command */
 }
