@@ -99,8 +99,8 @@ void eval(char *cmdline)
         }
         /* Child process: stdin redirection */
         fd = open(argv[0], O_RDONLY);
-        close(0);
-        dup(fd);
+        //close(0);
+        dup2(fd,0);
         close(fd);
         if(fd<0)
             unix_error("exec error");
@@ -108,8 +108,8 @@ void eval(char *cmdline)
         fd2 = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, 0644);
         if(fd2<0)
             unix_error("exec error");
-        close(1);
-        dup(fd2);
+        // close(1);
+        dup2(fd2, 1);
         close(fd2);
         /* Child process: exec other program */
         execve(argv[0], argv, environ); /* Does NOT return */
