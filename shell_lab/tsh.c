@@ -169,26 +169,35 @@ void eval(char *cmdline)
     char *buf[MAXLINE];
     int bg;
     pid_t pid;
+    sigset_t mask_all, mask_one, prev_one;
     bg = parseline(cmdline, argv);
+    sigfillset(&mask_all);
+    sigemptyset(&mask_one);
+    sigaddset(&mask_one, SIGCHLD);
+
     if(argv[0] == NULL)
         return;
     if(!builtin_cmd(argv)){
+        sigprocmask(SIG_BLOCK, &mask_one, &prev_one);
         if((pid = fork()) == 0){
+            sigprocmask(SIG_SETMASK, &prev_one, NULL);
             setpgid(0, 0);
             if(execve(argv[0], argv, environ) < 0){
                 printf("%s: Command not found.", argv[0]);
                 exit(1);
             }
         }
+        sigprocmask(SIG_BLOCK, &mask_all, NULL);
         /* Parent Process  */
         if(!bg){
-            // int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline) 
             addjob(jobs, pid, FG, cmdline);
+            sigprocmask(SIG_SETMASK, &prev_one, NULL);
             waitfg(pid);
         }
         else
         {
             addjob(jobs, pid, BG, cmdline);
+            sigprocmask(SIG_SETMASK, &prev_one, NULL);
             printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
         }
         
@@ -259,13 +268,14 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
-    //jobs, bf, fg, kill
+    //jobs, bf, fg, quit
     int i;
     for(i = 0; argv[i]!='\0';i++){
         if(strcmp(argv[i], "quit") == 0)
             exit(1);
         if(strcmp(argv[i], "jobs") == 0)
             listjobs(jobs);
+            return 1;
         if(strcmp(argv[i], "bf") == 0)
             return 1;
         if(strcmp(argv[i], "fg") == 0)
@@ -280,6 +290,38 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+    struct job_t* job;
+    char *op;
+    pid_t pid;
+    op = argv[0];
+    if(argv[1][0]  == '%'){
+        job = getjobjid(jobs, atoi(&argv[1][1]));
+        if(job == NULL){  
+            printf("%s: No such job\n", argv[1]);  
+            return;  
+        } else{
+            pid = job->pid;
+        }
+    } else {
+        pid = atoi(&argv[1]);
+        job = getjobpid(jobs, pid);
+        if(job == NULL){  
+            printf("%s: No such process\n", argv[1]);  
+            return;  
+        }
+    } 
+    kill(-pid, SIGCONT);
+    if(strcmp("fg", argv[0])) {
+        printf("Job [%d] (%d) %s", job->jid, job->pid, job->cmdline);
+        job->state = BG;
+    } 
+    else{
+        job->state = FG;
+        waitfg(job->pid);
+    } 
+
+    
+
     return;
 }
 
@@ -312,7 +354,28 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-    return;
+    pid_t pid;
+    int status;
+    // 모든 child process waiting
+    // WNOHANG : 종료된 child process 있으면 반환
+    // WUNTRACED : child process stop되면 반환
+    while((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0) {
+        // status가 정상 종료 
+        if (WIFEXITED(status)) {
+            deletejob(jobs, pid);
+        }
+        // 시그널로 인해 종료 
+        else if (WIFSIGNALED(status)) {
+            deletejob(jobs,pid);
+            printf("Job [%d] (%d) terminated by signal %d\n", pid2jid(pid), (int) pid, WTERMSIG(status));
+        }
+        // 시그널로 인해 stop
+        else if (WIFSTOPPED(status)) { 
+            getjobpid(jobs, pid)->state = ST; 
+            printf("Job [%d] (%d) stopped by signal %d\n", pid2jid(pid), (int) pid, WSTOPSIG(status));
+        }
+        
+    }
 }
 
 /* 
@@ -322,6 +385,9 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+    // pid의 절대값 process 그룹에 모두 signal 보냄
+    pid_t pid = fgpid(jobs);
+    kill(-pid, sig);
     return;
 }
 
@@ -332,6 +398,8 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    pid_t pid = fgpid(jobs);
+    kill(-pid, sig);   
     return;
 }
 
