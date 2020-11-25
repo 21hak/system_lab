@@ -107,9 +107,9 @@ void eval(char *cmdline)
         printf("0: %s\n", argv[0]);
         printf("1: %s\n", argv[1]);
         printf("2: %s\n", argv[2]);
-        // if(argv[2] == NULL){
-        //     app_error("NO redirection here");
-        // }
+        if(argv[2] == NULL){
+            app_error("NO redirection here");
+        }
         // else {
         //     int fd = open(argv[0], O_WRONLY | O_APPEND);
         //     if(fd<0)
@@ -128,8 +128,12 @@ void eval(char *cmdline)
         close(0);
         dup(fd);
         close(fd);
+        if(fd<0)
+            unix_error("exec error");
         /* Child process: stdout redirection */
         fd2 = creat(argv[2], 0644);
+        if(fd2<0)
+            unix_error("exec error");
         close(1);
         dup(fd2);
         close(fd2);
