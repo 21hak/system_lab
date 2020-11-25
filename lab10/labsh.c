@@ -111,10 +111,8 @@ void eval(char *cmdline)
         //exec other program 
         execve(argv[0], argv, environ); 
     } else {
-        // while (!(wait(&status) == pid))
         wait(NULL);
     }
-    // return;
 }
 
 /* 
