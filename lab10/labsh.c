@@ -82,9 +82,7 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline) 
 {
-    int check = 0;
     char *argv[MAXARGS];
-    char buf[MAXLINE];
     pid_t pid;
     int fd;
     int fd2;
@@ -97,22 +95,21 @@ void eval(char *cmdline)
         if(argv[2] == NULL){
             app_error("NO redirection here");
         }
-        /* Child process: stdin redirection */
+        // stdin redirection
         fd = open(argv[0], O_RDONLY);
-        //close(0);
         dup2(fd,0);
         close(fd);
         if(fd<0)
             unix_error("exec error");
-        /* Child process: stdout redirection */
+        // stdout redirection
         fd2 = open(argv[2], O_WRONLY | O_APPEND | O_CREAT, 0644);
         if(fd2<0)
             unix_error("exec error");
-        // close(1);
         dup2(fd2, 1);
         close(fd2);
-        /* Child process: exec other program */
-        execve(argv[0], argv, environ); /* Does NOT return */
+
+        //exec other program 
+        execve(argv[0], argv, environ); 
     } else {
         // while (!(wait(&status) == pid))
         wait(NULL);
