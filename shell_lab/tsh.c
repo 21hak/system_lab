@@ -186,20 +186,22 @@ void eval(char *cmdline)
                 printf("%s: Command not found.", argv[0]);
                 exit(1);
             }
+        } else {
+            sigprocmask(SIG_BLOCK, &mask_all, NULL);
+            /* Parent Process  */
+            if(!bg){
+                addjob(jobs, pid, FG, cmdline);
+                sigprocmask(SIG_SETMASK, &prev_one, NULL);
+                waitfg(pid);
+            }
+            else
+            {
+                addjob(jobs, pid, BG, cmdline);
+                sigprocmask(SIG_SETMASK, &prev_one, NULL);
+                printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
+            }
         }
-        sigprocmask(SIG_BLOCK, &mask_all, NULL);
-        /* Parent Process  */
-        if(!bg){
-            addjob(jobs, pid, FG, cmdline);
-            sigprocmask(SIG_SETMASK, &prev_one, NULL);
-            waitfg(pid);
-        }
-        else
-        {
-            addjob(jobs, pid, BG, cmdline);
-            sigprocmask(SIG_SETMASK, &prev_one, NULL);
-            printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
-        }
+        
         
     }
     return;
