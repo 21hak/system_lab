@@ -268,7 +268,7 @@ int builtin_cmd(char **argv)
 {
     //jobs, bf, fg, quit  
         if(strcmp(argv[0], "quit") == 0)
-            exit(0);
+            exit(1);
         if(strcmp(argv[0], "jobs") == 0){
             listjobs(jobs);
             return 1;
