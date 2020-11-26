@@ -295,7 +295,7 @@ void do_bgfg(char **argv)
         printf("%s command requires PID or %%jobid argument\n", argv[0]);
         return;
     }
-    if(!isdigit(argv[1])){
+    if(!isdigit(argv[1][0])){
         if(argv[1][0] != '%'){
             printf("%s: argument must be a PID or %%jobid\n", argv[0]);
             return;
