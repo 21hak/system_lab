@@ -290,7 +290,6 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {
     struct job_t* job;
-    // pid_t pid;
     if(argv[1] == NULL){
         printf("%s command requires PID or %%jobid argument\n", argv[0]);
         return;
@@ -308,11 +307,7 @@ void do_bgfg(char **argv)
             printf("%s: No such job\n", argv[1]);  
             return;  
         }
-        // else{
-        //     pid = job->pid;
-        // }
     } else {
-        // pid = atoi(argv[1]);
         job = getjobpid(jobs, atoi(argv[1]));
         if(job == NULL){  
             printf("%s: No such process\n", argv[1]);  
