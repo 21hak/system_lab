@@ -200,9 +200,6 @@ void eval(char *cmdline)
             sigprocmask(SIG_SETMASK, &prev_one, NULL);
             printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
         }
-    
-        
-        
     }
     return;
 }
@@ -294,25 +291,26 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {
     struct job_t* job;
-    pid_t pid;
+    // pid_t pid;
     if(argv[1][0]  == '%'){
         job = getjobjid(jobs, atoi(&argv[1][1]));
         if(job == NULL){  
             printf("%s: No such job\n", argv[1]);  
             return;  
-        } else{
-            pid = job->pid;
         }
+        // else{
+        //     pid = job->pid;
+        // }
     } else {
-        pid = atoi(argv[1]);
-        job = getjobpid(jobs, pid);
+        // pid = atoi(argv[1]);
+        job = getjobpid(jobs, atoi(argv[1]));
         if(job == NULL){  
             printf("%s: No such process\n", argv[1]);  
             return;  
         }
     } 
-    kill(-pid, SIGCONT);
-    if(strcmp("fg", argv[0])) {
+    kill(-job->pid, SIGCONT);
+    if(strcmp("fg", argv[0]) != 0) {
         printf("Job [%d] (%d) %s", job->jid, job->pid, job->cmdline);
         job->state = BG;
     } 
