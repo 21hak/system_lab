@@ -292,7 +292,7 @@ void do_bgfg(char **argv)
     struct job_t* job;
     // pid_t pid;
     if(argv[1] == NULL){
-        printf("%s command requires PID or %jobid argument", argv[0]);
+        printf("%s command requires PID or %%jobid argument", argv[0]);
         return;
     }
     if(!isdigit(argv[1])){
