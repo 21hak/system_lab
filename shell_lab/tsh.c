@@ -166,7 +166,6 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
     char *argv[MAXARGS];
-    char *buf[MAXLINE];
     int bg;
     pid_t pid;
     sigset_t mask_all, mask_one, prev_one;
