@@ -29,24 +29,49 @@
 #define INIT_SIZE 16
 #define BLOCKSIZE 16
 #define WORDSIZE 4
+#define DEREF(p) (*(size_t*)(p))
+#define NEXT_FREE(p)(*(void **)(p))
+#define PREV_FREE(p)(*(void **)(p + WORDSIZE))
 
 /* 
  * mm_init - initialize the malloc package.
  */
-static char* heap_ptr = 0;
+static inline char* heap_ptr = 0;
 static char* free_list_ptr = 0;
+
+static inline void * get_header(void* block_ptr){
+    return block_ptr - WORDSIZE;
+}
+
+static inline size_t get_size(void *block_ptr){
+    return DEREF(get_header(block_ptr)) | (~0x1);
+}
+
+static inline void* get_is_alloc(void* block_ptr){
+    return DEREF(get_header(block_ptr)) | (0x1);
+}
+
+static inline void* get_footer(void* block_ptr){
+    return block_ptr + (get_size(block_ptr) - 2 * WORDSIZE);
+}
+
+
+
+
 
 int mm_init(void)
 {
     heap_ptr = mem_sbrk(INIT_SIZE+BLOCKSIZE);
     if(heap_ptr == (void*)-1)
         return -1;
-    (*(size_t*))heap_ptr = BLOCKSIZE | 1;
-    (*(size_t*))(heap_ptr + WORDSIZE ) = BLOCKSIZE | 0;
-    (*(size_t*))(heap_ptr + 2*WORDSIZE) = 0 | 0;
-    (*(size_t*))(heap_ptr + 3*WORDSIZE) = 0 | 0;
-    (*(size_t*))(heap_ptr + 4*WORDSIZE) = BLOCKSIZE | 0;
-    (*(size_t*))(heap_ptr + 5*WORDSIZE) = BLOCKSIZE | 1;
+    DEREF(heap_ptr) = BLOCKSIZE | 1;
+    DEREF(heap_ptr + WORDSIZE ) = BLOCKSIZE | 0;
+    DEREF(heap_ptr + 2*WORDSIZE) = 0 | 0;
+    DEREF(heap_ptr + 3*WORDSIZE) = 0 | 0;
+    DEREF(heap_ptr + 4*WORDSIZE) = BLOCKSIZE | 0;
+    DEREF(heap_ptr + 5*WORDSIZE) = BLOCKSIZE | 1;
+    free_list_ptr = heap_ptr + WORDSIZE;
+    return 0;
 }
 
 /* 
@@ -55,14 +80,102 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
-	return NULL;
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+    size_t need_size;
+    char *free_block_ptr = NULL;
+    if(size==0)
+        return free_block_ptr;
+    
+
+    need_size = ALIGN(size) + 2*WORDSIZE, BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
+    free_block_ptr = find_fit(need_size);
+    if(free_block_ptr){        
+        allocate(free_block_ptr, need_size);
     }
+    else{
+        free_block_ptr = extend_heap(need_size);
+        if(free_block_ptr==NULL)
+            return free_block_ptr;
+        allocate(free_block_ptr, need_size);
+    }
+    return free_block_ptr;
+}
+
+/*
+ * find_fit
+*/
+static void *find_fit(size_t size){
+    void* free_block_ptr = NULL;
+    for (free_block_ptr = free_list_ptr; get_is_alloc(free_block_ptr) == 0; free_block_ptr = NEXT_FREE(free_block_ptr) ){
+        if(size <= get_size(free_block_ptr))
+            return free_block_ptr;
+    }
+    return free_block_ptr;
+}
+
+static void allocate(void* block_ptr, size_t size){
+    void **ptr;
+    void *new_block_ptr;
+    size_t total_size = get_size(block_ptr);
+    if(total_size >= size + BLOCKSIZE){
+        *ptr = get_header(block_ptr);
+        new_block_ptr = block_ptr + size;
+        DEREF(*ptr) = BLOCKSIZE | 1;
+        DEREF(*ptr + size - WORDSIZE) = BLOCKSIZE | 1;
+        DEREF(get_header(new_block_ptr)) = BLOCKSIZE | 0;
+        DEREF(get_footer(new_block_ptr)+ total_size - size) = BLOCKSIZE | 0;
+        NEXT_FREE(new_block_ptr) =  NEXT_FREE(block_ptr);
+        PREV_FREE(NEXT_FREE(block_ptr)) = new_block_ptr;
+        NEXT_FREE(block_ptr) = new_block_ptr;
+        PREV_FREE(new_block_ptr) = block_ptr;
+        
+        
+    }
+    else{
+        *ptr = get_header(block_ptr);
+        DEREF(*ptr) = BLOCKSIZE | 1;
+        *ptr = get_footer(block_ptr);
+        DEREF(*ptr) = BLOCKSIZE | 1;
+    }
+    remove_block_from_free_list(block_ptr);
+
+    
+}
+
+static void remove_block_from_free_list(void *block_ptr){
+    if(block_ptr==NULL)
+        return;
+    if(PREV_FREE(block_ptr) != NULL){
+        NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr);
+    } else
+    {
+      free_list_ptr = NEXT_FREE(block_ptr);
+    }
+    
+    if(NEXT_FREE(block_ptr)!=NULL){
+        PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
+    }    
+}
+static void* extend_heap(size_t size){
+    size_t need_size = size % BLOCKSIZE ? size + (BLOCKSIZE - size) : size;
+    char *free_block_ptr = NULL;
+    void** ptr;
+    if(need_size == 0)
+        need_size = BLOCKSIZE;
+    free_block_ptr = mem_sbrk(need_size);
+    if(free_block_ptr == (void*)-1)
+        return NULL;
+    *ptr = get_header(free_block_ptr);
+    DEREF(*ptr) = need_size | 0;
+    *ptr = get_footer(free_block_ptr);
+    DEREF(*ptr) = need_size | 0;
+
+    *ptr = get_header(free_block_ptr);
+    DEREF(get_header(*ptr + need_size)) = BLOCKSIZE |1;
+    coalesce(free_block_ptr);
+    return free_block_ptr;
+}
+static void* coalesce(void* ptr){
+    
 }
 
 /*
@@ -70,26 +183,22 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+    if(ptr == NULL)
+        return;
+    size_t size = DEREF(get_header(ptr)) & (~0x1);
+    DEREF(HEADER(ptr)) = size | 0;
+    DEREF(get_footer(ptr)) = size | 0;
+
+    coalesce(ptr);
 }
+
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-    
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+  
 }
 
 
