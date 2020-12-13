@@ -66,8 +66,7 @@ static void* coalesce(void* ptr);
 
 int mm_init(void)
 {
-    heap_ptr = mem_sbrk(INIT_SIZE+BLOCKSIZE);
-    printf("reached");
+    heap_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE);
     if(heap_ptr == (void*)-1)
         return -1;
     DEREF(heap_ptr) = BLOCKSIZE | 1;
@@ -77,7 +76,6 @@ int mm_init(void)
     DEREF(heap_ptr + 4*WORDSIZE) = BLOCKSIZE | 0;
     DEREF(heap_ptr + 5*WORDSIZE) = BLOCKSIZE | 1;
     free_list_ptr = heap_ptr + WORDSIZE;
-    printf("reached");
     return 0;
 }
 
@@ -90,18 +88,17 @@ void *mm_malloc(size_t size)
     size_t need_size;
     char *free_block_ptr = NULL;
     if(size==0)
-        return free_block_ptr;
-    
+        return NULL;
 
-    need_size = ALIGN(size) + 2*WORDSIZE > BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
+    need_size = ALIGN(size) + 2 * WORDSIZE > BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
     free_block_ptr = find_fit(need_size);
     if(free_block_ptr){        
         allocate(free_block_ptr, need_size);
     }
     else{
         free_block_ptr = extend_heap(need_size);
-        if(free_block_ptr==NULL)
-            return free_block_ptr;
+        if(free_block_ptr == NULL)
+            return NULL;
         allocate(free_block_ptr, need_size);
     }
     return free_block_ptr;
@@ -112,7 +109,7 @@ void *mm_malloc(size_t size)
 */
 static void *find_fit(size_t size){
     void* free_block_ptr = NULL;
-    for (free_block_ptr = free_list_ptr; get_is_alloc(free_block_ptr) == 0; free_block_ptr = NEXT_FREE(free_block_ptr) ){
+    for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
         if(size <= get_size(free_block_ptr))
             return free_block_ptr;
     }
