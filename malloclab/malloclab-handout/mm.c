@@ -36,7 +36,7 @@
 /* 
  * mm_init - initialize the malloc package.
  */
-static inline char* heap_ptr = 0;
+static char* heap_ptr = 0;
 static char* free_list_ptr = 0;
 
 static inline void * get_header(void* block_ptr){
@@ -47,21 +47,27 @@ static inline size_t get_size(void *block_ptr){
     return DEREF(get_header(block_ptr)) | (~0x1);
 }
 
-static inline void* get_is_alloc(void* block_ptr){
+static inline size_t get_is_alloc(void* block_ptr){
     return DEREF(get_header(block_ptr)) | (0x1);
 }
 
 static inline void* get_footer(void* block_ptr){
     return block_ptr + (get_size(block_ptr) - 2 * WORDSIZE);
 }
+static void *find_fit(size_t size);
 
+static void allocate(void* block_ptr, size_t size);
 
+static void remove_block_from_free_list(void *block_ptr);
+static void* extend_heap(size_t size);
 
+static void* coalesce(void* ptr);
 
 
 int mm_init(void)
 {
     heap_ptr = mem_sbrk(INIT_SIZE+BLOCKSIZE);
+    printf("reached");
     if(heap_ptr == (void*)-1)
         return -1;
     DEREF(heap_ptr) = BLOCKSIZE | 1;
@@ -71,6 +77,7 @@ int mm_init(void)
     DEREF(heap_ptr + 4*WORDSIZE) = BLOCKSIZE | 0;
     DEREF(heap_ptr + 5*WORDSIZE) = BLOCKSIZE | 1;
     free_list_ptr = heap_ptr + WORDSIZE;
+    printf("reached");
     return 0;
 }
 
@@ -86,7 +93,7 @@ void *mm_malloc(size_t size)
         return free_block_ptr;
     
 
-    need_size = ALIGN(size) + 2*WORDSIZE, BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
+    need_size = ALIGN(size) + 2*WORDSIZE > BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
     free_block_ptr = find_fit(need_size);
     if(free_block_ptr){        
         allocate(free_block_ptr, need_size);
@@ -186,7 +193,7 @@ void mm_free(void *ptr)
     if(ptr == NULL)
         return;
     size_t size = DEREF(get_header(ptr)) & (~0x1);
-    DEREF(HEADER(ptr)) = size | 0;
+    DEREF(get_header(ptr)) = size | 0;
     DEREF(get_footer(ptr)) = size | 0;
 
     coalesce(ptr);
