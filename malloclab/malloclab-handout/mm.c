@@ -39,7 +39,7 @@
 static char* heap_ptr = 0;
 static char* free_list_ptr = 0;
 
-static inline void * get_header(void* block_ptr){
+static inline void *get_header(void* block_ptr){
     return block_ptr - WORDSIZE;
 }
 
@@ -91,11 +91,13 @@ void *mm_malloc(size_t size)
         return NULL;
 
     need_size = ALIGN(size) + 2 * WORDSIZE > BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
-    free_block_ptr = find_fit(need_size);
-    if(free_block_ptr){        
+    free_block_ptr = find_fit(need_size);     
+    if(free_block_ptr){
+        // while(1);
         allocate(free_block_ptr, need_size);
     }
     else{
+        // while(1);
         free_block_ptr = extend_heap(need_size);
         if(free_block_ptr == NULL)
             return NULL;
@@ -117,31 +119,26 @@ static void *find_fit(size_t size){
 }
 
 static void allocate(void* block_ptr, size_t size){
-    void **ptr;
-    void *new_block_ptr;
+    void *ptr;
+    void *new_block_ptr; 
     size_t total_size = get_size(block_ptr);
-    if(total_size >= size + BLOCKSIZE){
-        *ptr = get_header(block_ptr);
-        new_block_ptr = block_ptr + size;
-        DEREF(*ptr) = BLOCKSIZE | 1;
-        DEREF(*ptr + size - WORDSIZE) = BLOCKSIZE | 1;
-        DEREF(get_header(new_block_ptr)) = BLOCKSIZE | 0;
-        DEREF(get_footer(new_block_ptr)+ total_size - size) = BLOCKSIZE | 0;
-        NEXT_FREE(new_block_ptr) =  NEXT_FREE(block_ptr);
-        PREV_FREE(NEXT_FREE(block_ptr)) = new_block_ptr;
-        NEXT_FREE(block_ptr) = new_block_ptr;
-        PREV_FREE(new_block_ptr) = block_ptr;
-        
-        
+    if(total_size >= size + BLOCKSIZE){  
+        DEREF(get_header(block_ptr)) = size | 1;
+        DEREF(get_footer(block_ptr)) = size | 1; 
+        remove_block_from_free_list(block_ptr);
+        ptr = block_ptr + get_size(block_ptr);
+        DEREF(get_header(ptr)) = (total_size - size) | 0;
+        DEREF(get_footer(ptr)) = (total_size - size) | 0;
     }
     else{
-        *ptr = get_header(block_ptr);
-        DEREF(*ptr) = BLOCKSIZE | 1;
-        *ptr = get_footer(block_ptr);
-        DEREF(*ptr) = BLOCKSIZE | 1;
+        ptr = get_header(block_ptr);
+        DEREF(ptr) = BLOCKSIZE | 1;
+        ptr = get_footer(block_ptr);
+        DEREF(ptr) = BLOCKSIZE | 1;
+        remove_block_from_free_list(block_ptr);
     }
-    remove_block_from_free_list(block_ptr);
 
+    
     
 }
 
@@ -150,13 +147,14 @@ static void remove_block_from_free_list(void *block_ptr){
         return;
     if(PREV_FREE(block_ptr) != NULL){
         NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr);
-    } else
+    }
+    else
     {
       free_list_ptr = NEXT_FREE(block_ptr);
-    }
-    
+    } 
     if(NEXT_FREE(block_ptr)!=NULL){
-        PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
+        if(PREV_FREE(block_ptr))
+            PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
     }    
 }
 static void* extend_heap(size_t size){
