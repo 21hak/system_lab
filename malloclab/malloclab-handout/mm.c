@@ -165,21 +165,43 @@ static void *find_fit(size_t size){
 }
 
 static void allocate(void* block_ptr, size_t size){
-    void *ptr;
-    size_t total_size = get_size(get_header(block_ptr));
-     if(total_size >= size + BLOCKSIZE){
-         DEREF(get_header(block_ptr)) = size | 1;
-         DEREF(get_footer(block_ptr)) = size | 1;
-         remove_block_from_free_list(block_ptr);
-         block_ptr = get_next_block(block_ptr);
-         DEREF(get_header(block_ptr)) = (total_size - size) | 0;
-         DEREF(get_footer(block_ptr)) = (total_size - size) | 0;
-     }
-     else{
-         DEREF(get_header(block_ptr)) = BLOCKSIZE | 1;
-         DEREF(get_footer(block_ptr)) = BLOCKSIZE | 1;
-         remove_block_from_free_list(block_ptr);
-     }
+    // void *ptr;
+    // size_t total_size = get_size(get_header(block_ptr));
+    //  if(total_size >= size + BLOCKSIZE){
+    //      DEREF(get_header(block_ptr)) = size | 1;
+    //      DEREF(get_footer(block_ptr)) = size | 1;
+    //      remove_block_from_free_list(block_ptr);
+    //      block_ptr = get_next_block(block_ptr);
+    //      DEREF(get_header(block_ptr)) = (total_size - size) | 0;
+    //      DEREF(get_footer(block_ptr)) = (total_size - size) | 0;
+    //  }
+    //  else{
+    //      DEREF(get_header(block_ptr)) = BLOCKSIZE | 1;
+    //      DEREF(get_footer(block_ptr)) = BLOCKSIZE | 1;
+    //      remove_block_from_free_list(block_ptr);
+    //  }
+
+    size_t fsize = GET_SIZE(HDRP(block_ptr));
+
+    // Case 1: Splitting is performed 
+    if((fsize - size) >= (BLOCKSIZE)) {
+
+        DEREF(get_header(block_ptr)) =  size | 1;
+        DEREF(get_footer(block_ptr)) = size | 1;
+        remove_block_from_free_list(block_ptr);
+        block_ptr = get_next_block(block_ptr);
+        DEREF(get_header(block_ptr)) = fsize-size | 0;
+        DEREF(get_footer(block_ptr)) = fsize-size |0;
+        coalesce(block_ptr);
+    }
+
+    // Case 2: Splitting not possible. Use the full free block 
+    else {
+
+        DEREF(get_header(block_ptr)) = fsize |1;
+        DEREF(get_footer(block_ptr)) = fsize |1;
+        remove_block_from_free_list(block_ptr);
+    }
 }
 
 static void remove_block_from_free_list(void *block_ptr){
