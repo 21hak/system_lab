@@ -82,6 +82,14 @@ static inline void* get_prev_block(void* block_ptr){
     return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE));
 }
 
+static void *extend_heap(size_t words);
+static void *find_fit(size_t size);
+static void *coalesce(void *bp);
+static void place(void *bp, size_t asize);
+static void remove_freeblock(void *bp);
+
+
+
 
 // static void *find_fit(size_t size);
 // static void allocate(void* block_ptr, size_t size);
