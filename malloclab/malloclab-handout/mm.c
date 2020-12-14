@@ -193,29 +193,50 @@ static void remove_block_from_free_list(void *block_ptr){
   }
 }
 static void* extend_heap(size_t words){
-    char *free_block_ptr = NULL;
-    size_t size;
-    if(size == 0)
-        size = BLOCKSIZE;
+    // char *free_block_ptr = NULL;
+    // size_t size;
+    // if(size == 0)
+    //     size = BLOCKSIZE;
 
-    size = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
-    if (size < BLOCKSIZE)
-    size = BLOCKSIZE;
+    // size = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
+    // if (size < BLOCKSIZE)
+    // size = BLOCKSIZE;
 
-    free_block_ptr = mem_sbrk(size);
-    if(free_block_ptr == (void*)-1)
+    // free_block_ptr = mem_sbrk(size);
+    // if(free_block_ptr == (void*)-1)
+    //     return NULL;
+
+    // // DEREF(free_block_ptr) = size | 0;
+    // // DEREF(free_block_ptr+size - WORDSIZE) = size | 0;
+    // // DEREF(free_block_ptr+size) = 0 | 1;
+
+    // DEREF(get_header(free_block_ptr)) = size | 0;
+    // DEREF(get_footer(free_block_ptr)) = size | 0;
+    // DEREF(get_header(get_next_block(free_block_ptr))) = 0 | 1;
+
+    // coalesce(free_block_ptr);
+    // return free_block_ptr;
+    char *bp;
+    size_t asize;
+
+    /* Adjust the size so the alignment and minimum block size requirements
+    * are met. */ 
+    asize = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
+    if (asize < BLOCKSIZE)
+        asize = BLOCKSIZE;
+    
+    // Attempt to grow the heap by the adjusted size 
+    if ((bp = mem_sbrk(asize)) == (void *)-1)
         return NULL;
 
-    // DEREF(free_block_ptr) = size | 0;
-    // DEREF(free_block_ptr+size - WORDSIZE) = size | 0;
-    // DEREF(free_block_ptr+size) = 0 | 1;
+    /* Set the header and footer of the newly created free block, and
+    * push the epilogue header to the back */
+    DEREF(get_header(bp)) =  asize |0;
+    DEREF(get_footer(bp)) = asize | 0;
+    DEREF(get_header(get_next_block(bp))) = 0 | 1; /* Move the epilogue to the end */
 
-    DEREF(get_header(free_block_ptr)) = size | 0;
-    DEREF(get_footer(free_block_ptr)) = size | 0;
-    DEREF(get_header(get_next_block(free_block_ptr))) = 0 | 1;
-
-    coalesce(free_block_ptr);
-    return free_block_ptr;
+    // Coalesce any partitioned free memory 
+    return coalesce(bp); 
 }
 static void* coalesce(void* block_ptr){
     void *ptr;
@@ -271,12 +292,18 @@ static void* coalesce(void* block_ptr){
  */
 void mm_free(void *block_ptr)
 {
-    if(block_ptr == NULL)
+      // Ignore spurious requests 
+    if (!block_ptr)
         return;
-    size_t size = get_size(get_header(block_ptr));
-    DEREF(get_header(block_ptr)) = size | 0;
-    DEREF(get_footer(block_ptr)) = size | 0;
 
+    size_t size = get_size(get_header(block_ptr));
+
+    /* Set the header and footer allocated bits to 0, thus
+    * freeing the block */
+    DEREF(get_header(block_ptr)) =  size | 0;
+    DEREF(get_footer(block_ptr)) = size |0;
+
+    // Coalesce to merge any free blocks and add them to the list 
     coalesce(block_ptr);
 }
 
