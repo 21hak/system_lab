@@ -44,11 +44,11 @@ static inline void *get_header(void* block_ptr){
 }
 
 static inline size_t get_size(void *block_ptr){
-    return DEREF(get_header(block_ptr)) | (~0x1);
+    return DEREF(get_header(block_ptr)) & (~0x1);
 }
 
 static inline size_t get_is_alloc(void* block_ptr){
-    return DEREF(get_header(block_ptr)) | (0x1);
+    return DEREF(get_header(block_ptr)) & (0x1);
 }
 
 static inline void* get_footer(void* block_ptr){
@@ -96,6 +96,7 @@ void *mm_malloc(size_t size)
         allocate(free_block_ptr, need_size);
     }
     else{
+        while(1);
         free_block_ptr = extend_heap(need_size);
         if(free_block_ptr == NULL)
             return NULL;
@@ -109,7 +110,6 @@ void *mm_malloc(size_t size)
 */
 static void *find_fit(size_t size){
     void* free_block_ptr = free_list_ptr + WORDSIZE;
-
     while((free_block_ptr!=NULL) && (size>get_size(free_block_ptr))){
         free_block_ptr = NEXT_FREE(free_block_ptr);
     }
