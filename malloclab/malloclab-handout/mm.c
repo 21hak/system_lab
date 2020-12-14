@@ -42,11 +42,11 @@
 #define PUT(p, val)   (*(size_t *)(p) = (val))
 #define GET_SIZE(p)  (GET(p) & ~0x1)
 #define GET_ALLOC(p) (GET(p) & 0x1)
-#define HDRP(bp)     ((void *)(bp) - WORDSIZE)
-#define FTRP(bp)     ((void *)(bp) + GET_SIZE(HDRP(bp)) - 2*WORDSIZE)
+// #define HDRP(bp)     ((void *)(bp) - WORDSIZE)
+#define FTRP(bp)     ((void *)(bp) + GET_SIZE(get_header(bp)) - 2*WORDSIZE)
 
-// #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
-// #define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WORDSIZE))
+// #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(get_header(bp)))
+// #define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(get_header(bp) - WORDSIZE))
 
 /* 
  * mm_init - initialize the malloc package.
@@ -73,11 +73,11 @@ static inline void* get_footer(void* block_ptr){
 }
 
 static inline void* get_next_block(void* block_ptr){
-    return ((void *)(block_ptr) + GET_SIZE(HDRP(block_ptr)));
+    return ((void *)(block_ptr) + GET_SIZE(get_header(block_ptr)));
 }
 
 static inline void* get_prev_block(void* block_ptr){
-    return ((void *)(block_ptr) - GET_SIZE(HDRP(block_ptr) - WORDSIZE));
+    return ((void *)(block_ptr) - GET_SIZE(get_header(block_ptr) - WORDSIZE));
 }
 
 static void *extend_heap(size_t words);
@@ -444,11 +444,11 @@ void mm_free(void *bp)
   if (!bp)
       return;
 
-  size_t size = GET_SIZE(HDRP(bp));
+  size_t size = GET_SIZE(get_header(bp));
 
   /* Set the header and footer allocated bits to 0, thus
    * freeing the block */
-  PUT(HDRP(bp), PACK(size, 0));
+  PUT(get_header(bp), PACK(size, 0));
   PUT(FTRP(bp), PACK(size, 0));
 
   // Coalesce to merge any free blocks and add them to the list 
@@ -473,10 +473,10 @@ void *mm_realloc(void *ptr, size_t size)
   /* Otherwise, we assume ptr is not NULL and was returned by an earlier malloc or realloc call.
    * Get the size of the current payload */
   size_t asize = MAX(ALIGN(size) + 2*WORDSIZE, MINBLOCKSIZE);
-  size_t current_size = GET_SIZE(HDRP(ptr));
+  size_t current_size = GET_SIZE(get_header(ptr));
 
   void *bp;
-  char *next = HDRP(get_next_block(ptr));
+  char *next = get_header(get_next_block(ptr));
   size_t newsize = current_size + GET_SIZE(next);
 
   /* Case 1: Size is equal to the current payload size */
@@ -488,10 +488,10 @@ void *mm_realloc(void *ptr, size_t size)
 
     if( asize > MINBLOCKSIZE && (current_size - asize) > MINBLOCKSIZE) {  
 
-      PUT(HDRP(ptr), PACK(asize, 1));
+      PUT(get_header(ptr), PACK(asize, 1));
       PUT(FTRP(ptr), PACK(asize, 1));
       bp = get_next_block(ptr);
-      PUT(HDRP(bp), PACK(current_size - asize, 1));
+      PUT(get_header(bp), PACK(current_size - asize, 1));
       PUT(FTRP(bp), PACK(current_size - asize, 1));
       mm_free(bp);
       return ptr;
@@ -514,10 +514,10 @@ void *mm_realloc(void *ptr, size_t size)
 
       // merge, split, and release
       remove_freeblock(get_next_block(ptr));
-      PUT(HDRP(ptr), PACK(asize, 1));
+      PUT(get_header(ptr), PACK(asize, 1));
       PUT(FTRP(ptr), PACK(asize, 1));
       bp = get_next_block(ptr);
-      PUT(HDRP(bp), PACK(newsize-asize, 1));
+      PUT(get_header(bp), PACK(newsize-asize, 1));
       PUT(FTRP(bp), PACK(newsize-asize, 1));
       mm_free(bp);
       return ptr;
@@ -554,9 +554,9 @@ static void *extend_heap(size_t words)
 
   /* Set the header and footer of the newly created free block, and
    * push the epilogue header to the back */
-  PUT(HDRP(bp), PACK(asize, 0));
+  PUT(get_header(bp), PACK(asize, 0));
   PUT(FTRP(bp), PACK(asize, 0));
-  PUT(HDRP(get_next_block(bp)), PACK(0, 1)); /* Move the epilogue to the end */
+  PUT(get_header(get_next_block(bp)), PACK(0, 1)); /* Move the epilogue to the end */
 
   // Coalesce any partitioned free memory 
   return coalesce(bp); 
@@ -575,8 +575,8 @@ static void *find_fit(size_t size)
 
   /* Iterate through the free list and try to find a free block
    * large enough */
-  for (bp = free_listp; GET_ALLOC(HDRP(bp)) == 0; bp = NEXT_FREE(bp)) {
-    if (size <= GET_SIZE(HDRP(bp))) 
+  for (bp = free_listp; GET_ALLOC(get_header(bp)) == 0; bp = NEXT_FREE(bp)) {
+    if (size <= GET_SIZE(get_header(bp))) 
       return bp; 
   }
   // Otherwise no free block was large enough
@@ -615,39 +615,39 @@ static void *coalesce(void *bp)
 {
   // Determine the current allocation state of the previous and next blocks 
   size_t prev_alloc = GET_ALLOC(FTRP(get_prev_block(bp))) || get_prev_block(bp) == bp;
-  size_t next_alloc = GET_ALLOC(HDRP(get_next_block(bp)));
+  size_t next_alloc = GET_ALLOC(get_header(get_next_block(bp)));
 
   // Get the size of the current free block
-  size_t size = GET_SIZE(HDRP(bp));
+  size_t size = GET_SIZE(get_header(bp));
 
   /* If the next block is free, then coalesce the current block
    * (bp) and the next block */
   if (prev_alloc && !next_alloc) {           // Case 2 (in text) 
-    size += GET_SIZE(HDRP(get_next_block(bp)));  
+    size += GET_SIZE(get_header(get_next_block(bp)));  
     remove_freeblock(get_next_block(bp));
-    PUT(HDRP(bp), PACK(size, 0));
+    PUT(get_header(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
   }
 
   /* If the previous block is free, then coalesce the current
    * block (bp) and the previous block */
   else if (!prev_alloc && next_alloc) {      // Case 3 (in text) 
-    size += GET_SIZE(HDRP(get_prev_block(bp)));
+    size += GET_SIZE(get_header(get_prev_block(bp)));
     bp = get_prev_block(bp); 
     remove_freeblock(bp);
-    PUT(HDRP(bp), PACK(size, 0));
+    PUT(get_header(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
   } 
 
   /* If the previous block and next block are free, coalesce
    * both */
   else if (!prev_alloc && !next_alloc) {     // Case 4 (in text) 
-    size += GET_SIZE(HDRP(get_prev_block(bp))) + 
-            GET_SIZE(HDRP(get_next_block(bp)));
+    size += GET_SIZE(get_header(get_prev_block(bp))) + 
+            GET_SIZE(get_header(get_next_block(bp)));
     remove_freeblock(get_prev_block(bp));
     remove_freeblock(get_next_block(bp));
     bp = get_prev_block(bp);
-    PUT(HDRP(bp), PACK(size, 0));
+    PUT(get_header(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
   }
 
@@ -674,16 +674,16 @@ static void *coalesce(void *bp)
 static void place(void *bp, size_t asize)
 {  
   // Gets the total size of the free block 
-  size_t fsize = GET_SIZE(HDRP(bp));
+  size_t fsize = GET_SIZE(get_header(bp));
 
   // Case 1: Splitting is performed 
   if((fsize - asize) >= (MINBLOCKSIZE)) {
 
-    PUT(HDRP(bp), PACK(asize, 1));
+    PUT(get_header(bp), PACK(asize, 1));
     PUT(FTRP(bp), PACK(asize, 1));
     remove_freeblock(bp);
     bp = get_next_block(bp);
-    PUT(HDRP(bp), PACK(fsize-asize, 0));
+    PUT(get_header(bp), PACK(fsize-asize, 0));
     PUT(FTRP(bp), PACK(fsize-asize, 0));
     coalesce(bp);
   }
@@ -691,7 +691,7 @@ static void place(void *bp, size_t asize)
   // Case 2: Splitting not possible. Use the full free block 
   else {
 
-    PUT(HDRP(bp), PACK(fsize, 1));
+    PUT(get_header(bp), PACK(fsize, 1));
     PUT(FTRP(bp), PACK(fsize, 1));
     remove_freeblock(bp);
   }
@@ -703,25 +703,25 @@ static void place(void *bp, size_t asize)
 
 //   // Is every block in the free list marked as free?
 //   void *next;
-//   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
-//     if (GET_ALLOC(HDRP(next))) {
+//   for (next = free_listp; GET_ALLOC(get_header(next)) == 0; next = NEXT_FREE(next)) {
+//     if (GET_ALLOC(get_header(next))) {
 //       printf("Consistency error: block %p in free list but marked allocated!", next);
 //       return 1;
 //     }
 //   }
 
 //   // Are there any contiguous free blocks that escaped coalescing?
-//   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+//   for (next = free_listp; GET_ALLOC(get_header(next)) == 0; next = NEXT_FREE(next)) {
 
-//     char *prev = PREV_FREE(HDRP(next));
-//       if(prev != NULL && HDRP(next) - FTRP(prev) == 2*WORDSIZE) {
+//     char *prev = PREV_FREE(get_header(next));
+//       if(prev != NULL && get_header(next) - FTRP(prev) == 2*WORDSIZE) {
 //         printf("Consistency error: block %p missed coalescing!", next);
 //         return 1;
 //       }
 //   }
 
 //   // Do the pointers in the free list point to valid free blocks?
-//   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+//   for (next = free_listp; GET_ALLOC(get_header(next)) == 0; next = NEXT_FREE(next)) {
 
 //     if(next < mem_heap_lo() || next > mem_heap_hi()) {
 //       printf("Consistency error: free block %p invalid", next);
