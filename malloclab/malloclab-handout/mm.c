@@ -41,7 +41,7 @@
 #define GET(p)        (*(size_t *)(p))
 #define PUT(p, val)   (*(size_t *)(p) = (val))
 // #define GET_SIZE(p)  (GET(p) & ~0x1)
-#define GET_ALLOC(p) (GET(p) & 0x1)
+// #define GET_ALLOC(p) (GET(p) & 0x1)
 // #define HDRP(bp)     ((void *)(bp) - WORDSIZE)
 // #define FTRP(bp)     ((void *)(bp) + get_size(get_header(bp)) - 2*WORDSIZE)
 
@@ -510,7 +510,7 @@ void *mm_realloc(void *ptr, size_t size)
     // next block is unallocated and is large enough to complete the request
     // merge current block with next block up to the size needed and free the 
     // remaining block.
-    if ( !GET_ALLOC(next) && newsize >= asize ) {
+    if ( !get_is_alloc(next) && newsize >= asize ) {
 
       // merge, split, and release
       remove_freeblock(get_next_block(ptr));
@@ -575,7 +575,7 @@ static void *find_fit(size_t size)
 
   /* Iterate through the free list and try to find a free block
    * large enough */
-  for (bp = free_listp; GET_ALLOC(get_header(bp)) == 0; bp = NEXT_FREE(bp)) {
+  for (bp = free_listp; get_is_alloc(get_header(bp)) == 0; bp = NEXT_FREE(bp)) {
     if (size <= get_size(get_header(bp))) 
       return bp; 
   }
@@ -614,8 +614,8 @@ static void remove_freeblock(void *bp)
 static void *coalesce(void *bp)
 {
   // Determine the current allocation state of the previous and next blocks 
-  size_t prev_alloc = GET_ALLOC(get_footer(get_prev_block(bp))) || get_prev_block(bp) == bp;
-  size_t next_alloc = GET_ALLOC(get_header(get_next_block(bp)));
+  size_t prev_alloc = get_is_alloc(get_footer(get_prev_block(bp))) || get_prev_block(bp) == bp;
+  size_t next_alloc = get_is_alloc(get_header(get_next_block(bp)));
 
   // Get the size of the current free block
   size_t size = get_size(get_header(bp));
@@ -703,15 +703,15 @@ static void place(void *bp, size_t asize)
 
 //   // Is every block in the free list marked as free?
 //   void *next;
-//   for (next = free_listp; GET_ALLOC(get_header(next)) == 0; next = NEXT_FREE(next)) {
-//     if (GET_ALLOC(get_header(next))) {
+//   for (next = free_listp; get_is_alloc(get_header(next)) == 0; next = NEXT_FREE(next)) {
+//     if (get_is_alloc(get_header(next))) {
 //       printf("Consistency error: block %p in free list but marked allocated!", next);
 //       return 1;
 //     }
 //   }
 
 //   // Are there any contiguous free blocks that escaped coalescing?
-//   for (next = free_listp; GET_ALLOC(get_header(next)) == 0; next = NEXT_FREE(next)) {
+//   for (next = free_listp; get_is_alloc(get_header(next)) == 0; next = NEXT_FREE(next)) {
 
 //     char *prev = PREV_FREE(get_header(next));
 //       if(prev != NULL && get_header(next) - get_footer(prev) == 2*WORDSIZE) {
@@ -721,7 +721,7 @@ static void place(void *bp, size_t asize)
 //   }
 
 //   // Do the pointers in the free list point to valid free blocks?
-//   for (next = free_listp; GET_ALLOC(get_header(next)) == 0; next = NEXT_FREE(next)) {
+//   for (next = free_listp; get_is_alloc(get_header(next)) == 0; next = NEXT_FREE(next)) {
 
 //     if(next < mem_heap_lo() || next > mem_heap_hi()) {
 //       printf("Consistency error: free block %p invalid", next);
