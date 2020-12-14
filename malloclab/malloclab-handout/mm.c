@@ -361,13 +361,13 @@ int mm_init(void)
   // initial free block. (32 bytes total)
   if ((heap_list_ptr = mem_sbrk(INITSIZE + MINBLOCKSIZE)) == (void *)-1)
       return -1; 
-  DEREF(heap_list_ptr) =              PACK(MINBLOCKSIZE, 1);           // Prologue header 
-  DEREF(heap_list_ptr +    WORDSIZE)=  PACK(MINBLOCKSIZE, 0);           // Free block header 
+  DEREF(heap_list_ptr) = (MINBLOCKSIZE | 1);           // Prologue header 
+  DEREF(heap_list_ptr + WORDSIZE)=  (MINBLOCKSIZE | 0);           // Free block header 
 
-  DEREF(heap_list_ptr + (2*WORDSIZE))= PACK(0,0);                       // Space for next pointer 
-  DEREF(heap_list_ptr + (3*WORDSIZE))= PACK(0,0);                       // Space for prev pointer 
-  DEREF(heap_list_ptr + (4*WORDSIZE))= PACK(MINBLOCKSIZE, 0);           // Free block footer 
-  DEREF(heap_list_ptr + (5*WORDSIZE))= PACK(0, 1);                      // Epilogue header 
+  DEREF(heap_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
+  DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
+  DEREF(heap_list_ptr + (4*WORDSIZE))= (MINBLOCKSIZE | 0);           // Free block footer 
+  DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
 
   // Point free_list to the first header of the first free block
   free_list_ptr = heap_list_ptr + (WORDSIZE);
@@ -435,8 +435,8 @@ void mm_free(void *bp)
 
   /* Set the header and footer allocated bits to 0, thus
    * freeing the block */
-  DEREF(get_header(bp)) = PACK(size, 0);
-  DEREF(get_footer(bp)) = PACK(size, 0);
+  DEREF(get_header(bp)) = (size | 0);
+  DEREF(get_footer(bp)) = (size | 0);
 
   // Coalesce to merge any free blocks and add them to the list 
   coalesce(bp);
@@ -475,11 +475,11 @@ void *mm_realloc(void *ptr, size_t size)
 
     if( asize > MINBLOCKSIZE && (current_size - asize) > MINBLOCKSIZE) {  
 
-      DEREF(get_header(ptr))= PACK(asize, 1);
-      DEREF(get_footer(ptr))= PACK(asize, 1);
+      DEREF(get_header(ptr))= (asize | 1);
+      DEREF(get_footer(ptr))= (asize | 1);
       bp = get_next_block(ptr);
-      DEREF(get_header(bp))=PACK(current_size - asize, 1);
-      DEREF(get_footer(bp))=PACK(current_size - asize, 1);
+      DEREF(get_header(bp))=(current_size - asize | 1);
+      DEREF(get_footer(bp))=(current_size - asize | 1);
       mm_free(bp);
       return ptr;
     }
@@ -501,11 +501,11 @@ void *mm_realloc(void *ptr, size_t size)
 
       // merge, split, and release
       remove_freeblock(get_next_block(ptr));
-      DEREF(get_header(ptr))= PACK(asize, 1);
-      DEREF(get_footer(ptr))= PACK(asize, 1);
+      DEREF(get_header(ptr))= (asize | 1);
+      DEREF(get_footer(ptr))= (asize | 1);
       bp = get_next_block(ptr);
-      DEREF(get_header(bp))=PACK(newsize-asize, 1);
-      DEREF(get_footer(bp))=PACK(newsize-asize, 1);
+      DEREF(get_header(bp))=(newsize-asize | 1);
+      DEREF(get_footer(bp))=(newsize-asize | 1);
       mm_free(bp);
       return ptr;
     }  
@@ -541,9 +541,9 @@ static void *extend_heap(size_t words)
 
   /* Set the header and footer of the newly created free block, and
    * push the epilogue header to the back */
-  DEREF(get_header(bp))= PACK(asize, 0);
-  DEREF(get_footer(bp))=PACK(asize, 0);
-  DEREF(get_header(get_next_block(bp)))=PACK(0, 1); /* Move the epilogue to the end */
+  DEREF(get_header(bp))= (asize | 0);
+  DEREF(get_footer(bp))=(asize | 0);
+  DEREF(get_header(get_next_block(bp)))=(0 | 1); /* Move the epilogue to the end */
 
   // Coalesce any partitioned free memory 
   return coalesce(bp); 
@@ -612,8 +612,8 @@ static void *coalesce(void *bp)
   if (prev_alloc && !next_alloc) {           // Case 2 (in text) 
     size += get_size(get_header(get_next_block(bp)));  
     remove_freeblock(get_next_block(bp));
-    DEREF(get_header(bp))= PACK(size, 0);
-    DEREF(get_footer(bp))= PACK(size, 0);
+    DEREF(get_header(bp))= (size | 0);
+    DEREF(get_footer(bp))= (size | 0);
   }
 
   /* If the previous block is free, then coalesce the current
@@ -622,8 +622,8 @@ static void *coalesce(void *bp)
     size += get_size(get_header(get_prev_block(bp)));
     bp = get_prev_block(bp); 
     remove_freeblock(bp);
-    DEREF(get_header(bp))= PACK(size, 0);
-    DEREF(get_footer(bp))= PACK(size, 0);
+    DEREF(get_header(bp))= (size | 0);
+    DEREF(get_footer(bp))= (size | 0);
   } 
 
   /* If the previous block and next block are free, coalesce
@@ -634,8 +634,8 @@ static void *coalesce(void *bp)
     remove_freeblock(get_prev_block(bp));
     remove_freeblock(get_next_block(bp));
     bp = get_prev_block(bp);
-    DEREF(get_header(bp))= PACK(size, 0);
-    DEREF(get_footer(bp))= PACK(size, 0);
+    DEREF(get_header(bp))= (size | 0);
+    DEREF(get_footer(bp))= (size | 0);
   }
 
   // Insert the coalesced block at the front of the free list 
@@ -666,20 +666,20 @@ static void place(void *bp, size_t asize)
   // Case 1: Splitting is performed 
   if((fsize - asize) >= (MINBLOCKSIZE)) {
 
-    DEREF(get_header(bp))= PACK(asize, 1);
-    DEREF(get_footer(bp))= PACK(asize, 1);
+    DEREF(get_header(bp))= (asize | 1);
+    DEREF(get_footer(bp))= (asize | 1);
     remove_freeblock(bp);
     bp = get_next_block(bp);
-    DEREF(get_header(bp))= PACK(fsize-asize, 0);
-    DEREF(get_footer(bp))= PACK(fsize-asize, 0);
+    DEREF(get_header(bp))= ((fsize-asize) | 0);
+    DEREF(get_footer(bp))= ((fsize-asize) | 0);
     coalesce(bp);
   }
 
   // Case 2: Splitting not possible. Use the full free block 
   else {
 
-    DEREF(get_header(bp))= PACK(fsize, 1);
-    DEREF(get_footer(bp))= PACK(fsize, 1);
+    DEREF(get_header(bp))= (fsize | 1);
+    DEREF(get_footer(bp))= (fsize | 1);
     remove_freeblock(bp);
   }
 }
