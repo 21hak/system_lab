@@ -203,7 +203,7 @@ static void* coalesce(void* block_ptr){
     else if (!prev_alloc && next_alloc) {      // Case 3 (in text) 
         size += get_size(get_header(get_prev_block(block_ptr)));
         block_ptr = get_prev_block(block_ptr); 
-        remove_freeblock(block_ptr);
+        remove_block_from_free_list(block_ptr);
         DEREF(get_header(block_ptr)) =  size | 0;
         DEREF(get_footer(block_ptr)) = size |0;
     } 
@@ -212,9 +212,9 @@ static void* coalesce(void* block_ptr){
     * both */
     else if (!prev_alloc && !next_alloc) {     // Case 4 (in text) 
         size += get_size(get_header(get_prev_block(block_ptr))) + 
-                get_size(get_header(NEXT_BLKP(block_ptr)));
-        remove_freeblock(get_prev_block(block_ptr));
-        remove_freeblock(NEXT_BLKP(block_ptr));
+                get_size(get_header(get_next_block(block_ptr)));
+        remove_block_from_free_list(get_prev_block(block_ptr));
+        remove_block_from_free_list(get_next_block(block_ptr));
         block_ptr = get_prev_block(block_ptr);
         DEREF(get_header(block_ptr)) =  size | 0;
         DEREF(get_footer(block_ptr)) = size | 0;
