@@ -93,11 +93,9 @@ void *mm_malloc(size_t size)
     need_size = ((ALIGN(size) + 2 * WORDSIZE) > BLOCKSIZE) ? (ALIGN(size) + 2 * WORDSIZE) : BLOCKSIZE;
     free_block_ptr = find_fit(need_size);     
     if(free_block_ptr){
-        // while(1);
         allocate(free_block_ptr, need_size);
     }
     else{
-         while(1);
         free_block_ptr = extend_heap(need_size);
         if(free_block_ptr == NULL)
             return NULL;
@@ -114,7 +112,6 @@ static void *find_fit(size_t size){
 
     while((free_block_ptr!=NULL) && (size>get_size(free_block_ptr))){
         free_block_ptr = NEXT_FREE(free_block_ptr);
-        while(1);
     }
     // for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
     //     if(size <= get_size(free_block_ptr))
@@ -202,7 +199,12 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-  
+    if(ptr == NULL)
+        return mm_malloc(size);
+    if (size == 0){
+        mm_free(ptr);
+        return NULL;
+    }
 }
 
 
