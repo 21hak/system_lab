@@ -199,8 +199,8 @@ void *mm_realloc(void *ptr, size_t size)
   size_t current_size = get_size(get_header(ptr));
 
   void *block_ptr;
-  char *next = get_header(get_next_block(ptr));
-  size_t newsize = current_size + get_size(next);
+//   char *next = get_header(get_next_block(ptr));
+//   size_t newsize = current_size + get_size(next);
 
   /* Case 1: Size is equal to the current payload size */
   if (asize == current_size)
@@ -218,6 +218,13 @@ void *mm_realloc(void *ptr, size_t size)
       DEREF(get_footer(block_ptr))=((current_size - asize) | 1);
       mm_free(block_ptr);
       return ptr;
+
+    //    DEREF(get_header(block_ptr))= (asize | 1);
+    // DEREF(get_footer(block_ptr))= (asize | 1);
+    // remove_block_from_free_list(block_ptr);
+    // block_ptr = get_next_block(block_ptr);
+    // DEREF(get_header(block_ptr))= ((fsize-asize) | 0);
+    // DEREF(get_footer(block_ptr))= ((fsize-asize) | 0);
     }
 
     // allocate a new block of the requested size and release the current block
@@ -233,18 +240,18 @@ void *mm_realloc(void *ptr, size_t size)
     // next block is unallocated and is large enough to complete the request
     // merge current block with next block up to the size needed and free the 
     // remaining block.
-    if ( !get_is_alloc(next) && newsize >= asize ) {
+    // if ( !get_is_alloc(next) && newsize >= asize ) {
 
-      // merge, split, and release
-      remove_block_from_free_list(get_next_block(ptr));
-      DEREF(get_header(ptr))= (asize | 1);
-      DEREF(get_footer(ptr))= (asize | 1);
-      block_ptr = get_next_block(ptr);
-      DEREF(get_header(block_ptr))=((newsize-asize) | 1);
-      DEREF(get_footer(block_ptr))=((newsize-asize) | 1);
-      mm_free(block_ptr);
-      return ptr;
-    }  
+    //   // merge, split, and release
+    //   remove_block_from_free_list(get_next_block(ptr));
+    //   DEREF(get_header(ptr))= (asize | 1);
+    //   DEREF(get_footer(ptr))= (asize | 1);
+    //   block_ptr = get_next_block(ptr);
+    //   DEREF(get_header(block_ptr))=((newsize-asize) | 1);
+    //   DEREF(get_footer(block_ptr))=((newsize-asize) | 1);
+    //   mm_free(block_ptr);
+    //   return ptr;
+    // }  
     
     // otherwise allocate a new block of the requested size and release the current block
     block_ptr = mm_malloc(asize); 
