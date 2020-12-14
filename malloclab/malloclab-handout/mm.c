@@ -40,48 +40,47 @@
 static char *heap_list_ptr = 0;  
 static char *free_list_ptr = 0;  
 
-// get size of the block
+// block size 반환
 static inline size_t get_size(void *header_ptr){
     return DEREF(header_ptr) & (~0x1);
 }
 
-// get alloc bit of the block
+// alloc bit 반환
 static inline size_t get_is_alloc(void* header_ptr){
     return DEREF(header_ptr) & (0x1);
 }
 
-// get header pointer of the block
+// header pointer 반환
 static inline void *get_header(void* block_ptr){
     return  ((void *)(block_ptr) - WORDSIZE);
 }
 
-// get footer pointer of the block
+// footer pointer 반환
 static inline void* get_footer(void* block_ptr){
     return  ((void *)(block_ptr) + get_size(get_header(block_ptr)) - 2*WORDSIZE);
 }
 
-// get next block pointer
+// 다음 block pointer 반환
 static inline void* get_next_block(void* block_ptr){
     return ((void *)(block_ptr) + get_size(get_header(block_ptr)));
 }
 
-// get previous block pointer
+// 이전 block pointer 반환
 static inline void* get_prev_block(void* block_ptr){
     return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE));
 }
 
-// static void *extend_heap(size_t words);
-static void *extend_heap(size_t asize);
+static void *extend_heap(size_t adjust_size);
 static void *find_fit(size_t size);
 static void *coalesce(void *block_ptr);
-static void allocate(void *block_ptr, size_t asize);
+static void allocate(void *block_ptr, size_t adjust_size);
 static void remove_block_from_free_list(void *block_ptr);
 static void insert_block_to_free_list(void *block_ptr);
 
-/*
-textbook 894p.
-Initialize heap list for memory allocation,
-*/
+/* 
+ * textbook 894p.
+ * dynamic memory allocation을 위한 heap list 초기화
+ */
 int mm_init(void){
 
     if ((heap_list_ptr = mem_sbrk(8*WORDSIZE)) == NULL) 
@@ -93,7 +92,7 @@ int mm_init(void){
     DEREF(heap_list_ptr + (3 * WORDSIZE))= (0 | 1);           // Epilogue header 
     free_list_ptr = heap_list_ptr + 2*WORDSIZE; 
 
-    // add an empty heap with minimum size
+    // 최소 크기 block 생성
     if (extend_heap(BLOCKSIZE) == NULL){ 
         return -1;
     }
@@ -102,42 +101,35 @@ int mm_init(void){
 }
 
 /*
- Allocate memory aligned to 8 bytes
-
- * A block is allocated according to this strategy:
- * (1) If a free block of the given size is found, then allocate that free block and return
- * a pointer to the payload of that block.
- * (2) Otherwise a free block could not be found, so an extension of the heap is necessary.
- * Simply extend the heap and allocate the allocated block in the new free block.
+ * 8byte로 align 되게 memory를 allocate
  */
 void *mm_malloc(size_t size){  
-    size_t asize;       
+    size_t adjust_size;       
     size_t extendsize; 
     char *block_ptr;
 
     if (size == 0)
         return NULL;
-    // add 2*WORDSIZE for header and footer
-    asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
+    // header, footer를 위해 2*WORDSIZE 추가
+    adjust_size = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
     
-    // find the free momory in the free list
-    if ((block_ptr = find_fit(asize))) {
-        allocate(block_ptr, asize);
+    // free list에서 free block을 찾음
+    if ((block_ptr = find_fit(adjust_size))) {
+        allocate(block_ptr, adjust_size);
         return block_ptr;
     }
 
-    // if there is no free memory, extend the heap
-    extendsize = MAX(asize, BLOCKSIZE);
+    // 해당 size의 free block이 없는 경우 extend heap
+    extendsize = MAX(adjust_size, BLOCKSIZE);
     if ((block_ptr = extend_heap(extendsize)) == NULL)
         return NULL;
 
-    // allocate the memory of asize
-    allocate(block_ptr, asize);
+    allocate(block_ptr, adjust_size);
     return block_ptr;
 }
 
 /*
- * mm_free - free the block using block pointer.
+ * mm_free - 입력 받은 block pointer가 가리키는 block을 free
  */
 void mm_free(void *block_ptr)
 { 
@@ -145,230 +137,194 @@ void mm_free(void *block_ptr)
       return;
   size_t size = get_size(get_header(block_ptr));
 
-  // set the allcate bit to zero
+  // allocate bit을 0로 변경
   DEREF(get_header(block_ptr)) = (size | 0);  
   DEREF(get_footer(block_ptr)) = (size | 0);
 
-  // after freeing a block, coalesce the free blocks.
+  // free 한 후 생성된 free block을 coalesce를 통해 다른 free block과 merge
   coalesce(block_ptr);
 }
 
 /*
- * mm_realloc - use mm_malloc and mm_free
+ * mm_realloc - 구현한 mm_malloc과 mm_free를 사용해서 구현
  */
-void *mm_realloc(void *ptr, size_t size)
-{
-  // if ptr is NULL, realloc is same as mm_malloc
-  if (ptr == NULL)
-    return mm_malloc(size);
+void *mm_realloc(void *ptr, size_t size){
+    // ptr이 NULL이면, realloc = mm_malloc(size)
+    if (ptr == NULL)
+        return mm_malloc(size);
 
-  // If size is zero, realloc is same as mm_free
-  if (size == 0) {
-    mm_free(ptr);
-    return NULL;
-  }
+    // size가 0면, realloc is same as mm_free(ptr)
+    if (size == 0) {
+        mm_free(ptr);
+        return NULL;
+    }
+        
+    size_t adjust_size = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE); // adjust size
+    size_t current_size = get_size(get_header(ptr)); // 현재 block size
+
+    void *block_ptr;
     
-  size_t asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE); // adjust size
-  size_t current_size = get_size(get_header(ptr)); // current block size
+    // 현재 size와 adjust size가 같으면 추가 작업 없이 입력받은 ptr 반환
+    if (adjust_size == current_size)
+        return ptr;
 
-  void *block_ptr;
-  
-  // if the size is same, just return the ptr
-  if (asize == current_size)
-    return ptr;
+    // adjust size가 현재 size보다 작으면
+    if ( adjust_size <= current_size ) {    
+        // splitting이 가능한지 확인 후 가능하면 진행.
+        if( adjust_size > BLOCKSIZE && (current_size - adjust_size) > BLOCKSIZE) {  
+        DEREF(get_header(ptr))= (adjust_size | 1);
+        DEREF(get_footer(ptr))= (adjust_size | 1);
+        block_ptr = get_next_block(ptr);
+        DEREF(get_header(block_ptr))=((current_size - adjust_size) | 1);
+        DEREF(get_footer(block_ptr))=((current_size - adjust_size) | 1);
+        mm_free(block_ptr);
+        return ptr;
+        }
 
-  // if size < current block size
-  if ( asize <= current_size ) {    
-    // check if splitting is available
-    if( asize > BLOCKSIZE && (current_size - asize) > BLOCKSIZE) {  
-      DEREF(get_header(ptr))= (asize | 1);
-      DEREF(get_footer(ptr))= (asize | 1);
-      block_ptr = get_next_block(ptr);
-      DEREF(get_header(block_ptr))=((current_size - asize) | 1);
-      DEREF(get_footer(block_ptr))=((current_size - asize) | 1);
-      mm_free(block_ptr);
-      return ptr;
+        // mm_malloc을 통해 새로운 block을 할당하고 기존 block은 free
+        block_ptr = mm_malloc(adjust_size);
+        memcpy(block_ptr, ptr, adjust_size);
+        mm_free(ptr);
+        return block_ptr;
+    }
+    // if adjust size가 현재 size보다 크면
+    else {
+        // mm_malloc을 통해 새로운 block을 할당하고 기존 block은 free
+        block_ptr = mm_malloc(adjust_size); 
+        memcpy(block_ptr, ptr, current_size);
+        mm_free(ptr);
+        return block_ptr;
     }
 
-    // allocate a new block and fre the current block
-    block_ptr = mm_malloc(asize);
-    memcpy(block_ptr, ptr, asize);
-    mm_free(ptr);
-    return block_ptr;
-  }
-  // if size > current block size
-  else {
-    // allocate a new block and fre the current block
-    block_ptr = mm_malloc(asize); 
-    memcpy(block_ptr, ptr, current_size);
-    mm_free(ptr);
-    return block_ptr;
-  }
-
 }
 
 
 /*
- * extend_heap - extends the heap to the aligned size.
+ * extend_heap - adjust size만큼 heap을 확장
  */
-static void *extend_heap(size_t asize)
+static void *extend_heap(size_t adjust_size)
 {
-  char *block_ptr;
-  //size_t asize;
+    char *block_ptr;
 
-  /* Adjust the size so the alignment and minimum block size requirements
-   * are met. */ 
-//   asize = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
-  if (asize < BLOCKSIZE)
-    asize = BLOCKSIZE;
-  
-  // Attempt to grow the heap by the adjusted size 
-  if ((block_ptr = mem_sbrk(asize)) == (void *)-1)
-    return NULL;
+    if (adjust_size < BLOCKSIZE)
+        adjust_size = BLOCKSIZE;
 
-  /* Set the header and footer of the newly created free block, and
-   * push the epilogue header to the back */
-  DEREF(get_header(block_ptr))= (asize | 0);
-  DEREF(get_footer(block_ptr))=(asize | 0);
-  DEREF(get_header(get_next_block(block_ptr)))=(0 | 1); /* Move the epilogue to the end */
+    if ((block_ptr = mem_sbrk(adjust_size)) == (void *)-1)
+        return NULL;
 
-  // Coalesce any partitioned free memory 
-  return coalesce(block_ptr); 
+    //  새로 할당한 block의 allocate bit을 0으로 setting, epilogue header을 맨 뒤에 위치
+    DEREF(get_header(block_ptr))= (adjust_size | 0);
+    DEREF(get_footer(block_ptr))=(adjust_size | 0);
+    DEREF(get_header(get_next_block(block_ptr)))=(0 | 1);
+    return coalesce(block_ptr); 
 }
 
 /*
- * find_fit - Attempts to find a free block of at least the given size in the free list.
- *
- * This function implements a first-fit search strategy for an explicit free list, which 
- * is simply a doubly linked list of free blocks.
+ * find_fit - first-fit을 사용해서 free list에서 free block 찾음.
  */
 static void *find_fit(size_t size)
 {
-  // First-fit search 
-  void *block_ptr;
-
-  /* Iterate through the free list and try to find a free block
-   * large enough */
-  for (block_ptr = free_list_ptr; get_is_alloc(get_header(block_ptr)) == 0; block_ptr = NEXT_FREE(block_ptr)) {
-    if (size <= get_size(get_header(block_ptr))) 
-      return block_ptr; 
-  }
-  // Otherwise no free block was large enough
-  return NULL; 
+    void *block_ptr;
+    for (block_ptr = free_list_ptr; get_is_alloc(get_header(block_ptr)) == 0; block_ptr = NEXT_FREE(block_ptr)) {
+        if (size <= get_size(get_header(block_ptr))) 
+        return block_ptr; 
+    }
+    return NULL; 
 }
 
 /*
- * remove_block_from_free_list - Removes the given free block pointed to by block_ptr from the free list.
- * 
- * The explicit free list is simply a doubly linked list. This function performs a removal
- * of the block from the doubly linked free list.
+ * remove_block_from_free_list - free list에서 해당 block pointer가 가리키는 free block을 삭제
  */
 static void remove_block_from_free_list(void *block_ptr)
 {
-  if(block_ptr) {
-    if (PREV_FREE(block_ptr))
-      NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr);
-    else
-      free_list_ptr = NEXT_FREE(block_ptr);
-    if(NEXT_FREE(block_ptr) != NULL)
-      PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
-  }
-}
-
-static void insert_block_to_free_list(void *block_ptr){
-  NEXT_FREE(block_ptr) = free_list_ptr;
-  PREV_FREE(free_list_ptr) = block_ptr;
-  PREV_FREE(block_ptr) = NULL;
-  free_list_ptr = block_ptr;
+    if(block_ptr) {
+        if (PREV_FREE(block_ptr))
+            NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr); 
+        else
+            free_list_ptr = NEXT_FREE(block_ptr);
+        if(NEXT_FREE(block_ptr) != NULL)
+            PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
+    }
 }
 
 /*
- * coalesce - Coalesces the memory surrounding block block_ptr using the Boundary Tag strategy
- * proposed in the text (Page 851, Section 9.9.11).
- * 
- * Adjancent blocks which are free are merged together and the aggregate free block
- * is added to the free list. Any individual free blocks which were merged are removed
- * from the free list.
+ * insert_block_to_free_list - free list의 맨 앞에 해당 block pointer가 가리키는 free block을 추가
+ */
+static void insert_block_to_free_list(void *block_ptr){
+    NEXT_FREE(block_ptr) = free_list_ptr;
+    PREV_FREE(free_list_ptr) = block_ptr;
+    PREV_FREE(block_ptr) = NULL;
+    free_list_ptr = block_ptr;
+}
+
+/*
+ * coalesce - 인접한 free block을 merge함
  */
 static void *coalesce(void *block_ptr)
 {
-  // Determine the current allocation state of the previous and next blocks 
-  size_t prev_alloc = get_is_alloc(get_footer(get_prev_block(block_ptr))) || get_prev_block(block_ptr) == block_ptr;
-  size_t next_alloc = get_is_alloc(get_header(get_next_block(block_ptr)));
+    size_t prev_alloc = get_is_alloc(get_footer(get_prev_block(block_ptr))) || get_prev_block(block_ptr) == block_ptr;
+    size_t next_alloc = get_is_alloc(get_header(get_next_block(block_ptr)));
 
-  // Get the size of the current free block
-  size_t size = get_size(get_header(block_ptr));
+    size_t size = get_size(get_header(block_ptr));
 
-  /* If the next block is free, then coalesce the current block
-   * (block_ptr) and the next block */
-  if (prev_alloc && !next_alloc) {           // Case 2 (in text) 
-    size += get_size(get_header(get_next_block(block_ptr)));  
-    remove_block_from_free_list(get_next_block(block_ptr));
-    DEREF(get_header(block_ptr))= (size | 0);
-    DEREF(get_footer(block_ptr))= (size | 0);
-  }
+    /* 다음 block만 free한 경우
+     * total size = current block size + next block size 
+     */
+    if (prev_alloc && !next_alloc) {
+        size += get_size(get_header(get_next_block(block_ptr)));
+        remove_block_from_free_list(get_next_block(block_ptr));
+        DEREF(get_header(block_ptr))= (size | 0);
+        DEREF(get_footer(block_ptr))= (size | 0);
+    }
 
-  /* If the previous block is free, then coalesce the current
-   * block (block_ptr) and the previous block */
-  else if (!prev_alloc && next_alloc) {      // Case 3 (in text) 
-    size += get_size(get_header(get_prev_block(block_ptr)));
-    block_ptr = get_prev_block(block_ptr); 
-    remove_block_from_free_list(block_ptr);
-    DEREF(get_header(block_ptr))= (size | 0);
-    DEREF(get_footer(block_ptr))= (size | 0);
-  } 
+    /* 이전 block만 free한 경우
+    *  total size = current block size + previous block size 
+    */
+    else if (!prev_alloc && next_alloc) {      
+        size += get_size(get_header(get_prev_block(block_ptr)));
+        block_ptr = get_prev_block(block_ptr); // block pointer을 업데이트
+        remove_block_from_free_list(block_ptr);
+        DEREF(get_header(block_ptr))= (size | 0);
+        DEREF(get_footer(block_ptr))= (size | 0);
+    } 
 
-  /* If the previous block and next block are free, coalesce
-   * both */
-  else if (!prev_alloc && !next_alloc) {     // Case 4 (in text) 
-    size += get_size(get_header(get_prev_block(block_ptr))) + 
-            get_size(get_header(get_next_block(block_ptr)));
-    remove_block_from_free_list(get_prev_block(block_ptr));
-    remove_block_from_free_list(get_next_block(block_ptr));
-    block_ptr = get_prev_block(block_ptr);
-    DEREF(get_header(block_ptr))= (size | 0);
-    DEREF(get_footer(block_ptr))= (size | 0);
-  }
+    /* 이전, 다음 모두 free한 경우
+    * both */
+    else if (!prev_alloc && !next_alloc) {
+        size += get_size(get_header(get_prev_block(block_ptr))) + 
+                get_size(get_header(get_next_block(block_ptr)));
+        remove_block_from_free_list(get_prev_block(block_ptr));
+        remove_block_from_free_list(get_next_block(block_ptr));
+        block_ptr = get_prev_block(block_ptr); // block pointer을 업데이트
+        DEREF(get_header(block_ptr))= (size | 0);
+        DEREF(get_footer(block_ptr))= (size | 0);
+    }
 
-  // Insert the coalesced block at the front of the free list 
-  insert_block_to_free_list(block_ptr);
-
-  // Return the coalesced block 
-  return block_ptr;
+    insert_block_to_free_list(block_ptr);
+    return block_ptr;
 }
 
 /*
- * allocate - Places a block of the given size in the free block pointed to by the given
- * pointer block_ptr.
- *
- * This placement is done using a split strategy. If the difference between the size of block 
- * being allocated (asize) and the total size of the free block (fsize) is greater than or equal
- * to the mimimum block size, then the block is split into two parts. The first block is the 
- * allocated block of size asize, and the second block is the remaining free block with a size
- * corresponding to the difference between the two block sizes.  
+ * allocate - 입력 받은 size만큼 block pointer가 가리키는 block을 할당시킴 (free에서 non free로)
  */
-static void allocate(void *block_ptr, size_t asize)
+static void allocate(void *block_ptr, size_t adjust_size)
 {  
-  // Gets the total size of the free block 
-  size_t fsize = get_size(get_header(block_ptr));
+  size_t free_size = get_size(get_header(block_ptr));
 
-  // Case 1: Splitting is performed 
-  if((fsize - asize) >= (BLOCKSIZE)) {
-
-    DEREF(get_header(block_ptr))= (asize | 1);
-    DEREF(get_footer(block_ptr))= (asize | 1);
+  // 빈 공간이 BLOCKSIZE보다 큰 경우 splitting을 통해 나머지 공간은 free list에 넣음
+  if((free_size - adjust_size) >= (BLOCKSIZE)) {
+    DEREF(get_header(block_ptr))= (adjust_size | 1);
+    DEREF(get_footer(block_ptr))= (adjust_size | 1);
     remove_block_from_free_list(block_ptr);
     block_ptr = get_next_block(block_ptr);
-    DEREF(get_header(block_ptr))= ((fsize-asize) | 0);
-    DEREF(get_footer(block_ptr))= ((fsize-asize) | 0);
+    DEREF(get_header(block_ptr))= ((free_size-adjust_size) | 0);
+    DEREF(get_footer(block_ptr))= ((free_size-adjust_size) | 0);
     coalesce(block_ptr);
   }
-
-  // Case 2: Splitting not possible. Use the full free block 
   else {
 
-    DEREF(get_header(block_ptr))= (fsize | 1);
-    DEREF(get_footer(block_ptr))= (fsize | 1);
+    DEREF(get_header(block_ptr))= (free_size | 1);
+    DEREF(get_footer(block_ptr))= (free_size | 1);
     remove_block_from_free_list(block_ptr);
   }
 }
