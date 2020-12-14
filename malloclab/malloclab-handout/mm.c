@@ -49,7 +49,7 @@ static inline size_t get_is_alloc(void* header_ptr){
 }
 
 static inline void *get_header(void* block_ptr){
-    return  ((void *)(block_ptr) - WORDSIZE)
+    return  ((void *)(block_ptr) - WORDSIZE);
 }
 
 static inline void* get_footer(void* block_ptr){
@@ -57,11 +57,11 @@ static inline void* get_footer(void* block_ptr){
 }
 
 static inline void* get_next_block(void* block_ptr){
-    return ((void *)(block_ptr) + get_size(get_header(block_ptr)))
+    return ((void *)(block_ptr) + get_size(get_header(block_ptr)));
 }
 
 static inline void* get_prev_block(void* block_ptr){
-    return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE))
+    return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE));
 }
 
 
