@@ -90,7 +90,7 @@ void *mm_malloc(size_t size)
     if(size==0)
         return NULL;
 
-    need_size = ALIGN(size) + 2 * WORDSIZE > BLOCKSIZE ? ALIGN(size) + 2 * WORDSIZE : BLOCKSIZE;
+    need_size = (ALIGN(size) + 2 * WORDSIZE) > BLOCKSIZE ? (ALIGN(size) + 2 * WORDSIZE) : BLOCKSIZE;
     free_block_ptr = find_fit(need_size);     
     if(free_block_ptr){
         // while(1);
@@ -110,11 +110,16 @@ void *mm_malloc(size_t size)
  * find_fit
 */
 static void *find_fit(size_t size){
-    void* free_block_ptr = NULL;
-    for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
-        if(size <= get_size(free_block_ptr))
-            return free_block_ptr;
+    void* free_block_ptr = free_list_ptr + WORDSIZE;
+
+    while((free_block_ptr!=NULL) && (size>get_size(free_block_ptr))){
+        free_block_ptr = NEXT_FREE(free_block_ptr);
+
     }
+    // for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
+    //     if(size <= get_size(free_block_ptr))
+    //         return free_block_ptr;
+    // }
     return free_block_ptr;
 }
 
