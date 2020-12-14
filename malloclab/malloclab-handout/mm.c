@@ -190,8 +190,8 @@ static void allocate(void* block_ptr, size_t size){
         DEREF(get_footer(block_ptr)) = size | 1;
         remove_block_from_free_list(block_ptr);
         block_ptr = get_next_block(block_ptr);
-        DEREF(get_header(block_ptr)) = fsize-size | 0;
-        DEREF(get_footer(block_ptr)) = fsize-size |0;
+        DEREF(get_header(block_ptr)) = (fsize-size) | 0;
+        DEREF(get_footer(block_ptr)) = (fsize-size) | 0;
         coalesce(block_ptr);
     }
 
