@@ -478,8 +478,8 @@ void *mm_realloc(void *ptr, size_t size)
       DEREF(get_header(ptr))= (asize | 1);
       DEREF(get_footer(ptr))= (asize | 1);
       bp = get_next_block(ptr);
-      DEREF(get_header(bp))=(current_size - asize | 1);
-      DEREF(get_footer(bp))=(current_size - asize | 1);
+      DEREF(get_header(bp))=((current_size - asize) | 1);
+      DEREF(get_footer(bp))=((current_size - asize) | 1);
       mm_free(bp);
       return ptr;
     }
@@ -504,8 +504,8 @@ void *mm_realloc(void *ptr, size_t size)
       DEREF(get_header(ptr))= (asize | 1);
       DEREF(get_footer(ptr))= (asize | 1);
       bp = get_next_block(ptr);
-      DEREF(get_header(bp))=(newsize-asize | 1);
-      DEREF(get_footer(bp))=(newsize-asize | 1);
+      DEREF(get_header(bp))=((newsize-asize) | 1);
+      DEREF(get_footer(bp))=((newsize-asize) | 1);
       mm_free(bp);
       return ptr;
     }  
