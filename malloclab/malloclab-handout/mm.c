@@ -89,7 +89,7 @@ int mm_init(void)
 //   DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
 
 //   free_list_ptr = heap_list_ptr + (WORDSIZE);
-    if ((free_list_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE)) == (void *)-1)
+    if ((free_list_ptr = mem_sbrk(BLOCKSIZE)) == (void *)-1)
         return -1; 
     // DEREF(heap_list_ptr) = (BLOCKSIZE | 1);           // Prologue header 
     DEREF(free_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
@@ -294,7 +294,7 @@ static void *find_fit(size_t size)
 //       return block_ptr; 
 //   }
     while(block_ptr!=NULL){
-        if(size <= get_size(block_ptr))
+        if(size <= get_size(get_header(block_ptr)))
             break;
         block_ptr = NEXT_FREE(block_ptr);
     }
