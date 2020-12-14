@@ -164,6 +164,7 @@ static void* extend_heap(size_t size){
     free_block_ptr = mem_sbrk(need_size);
     if(free_block_ptr == (void*)-1)
         return NULL;
+
     DEREF(free_block_ptr) = need_size | 0;
     DEREF(free_block_ptr+need_size - WORDSIZE) = need_size | 0;
     DEREF(free_block_ptr+need_size) = 0 | 1;
