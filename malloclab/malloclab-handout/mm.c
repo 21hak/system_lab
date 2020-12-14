@@ -70,39 +70,31 @@ static inline void* get_prev_block(void* block_ptr){
     return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE));
 }
 
-static void *extend_heap(size_t words);
+// static void *extend_heap(size_t words);
+static void *extend_heap(size_t asize)
 static void *find_fit(size_t size);
 static void *coalesce(void *block_ptr);
 static void allocate(void *block_ptr, size_t asize);
 static void remove_block_from_free_list(void *block_ptr);
 static void insert_block_to_free_list(void *block_ptr);
 
-
-int mm_init(void)
-{
-//   if ((heap_list_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE)) == (void *)-1)
-//       return -1; 
-//   DEREF(heap_list_ptr) = (BLOCKSIZE | 1);           // Prologue header 
-//   DEREF(heap_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
-
-//   DEREF(heap_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
-//   DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
-//   DEREF(heap_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
-//   DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
-
-//   free_list_ptr = heap_list_ptr + (WORDSIZE);
+/*
+textbook 894p.
+Initialize heap list for memory allocation,
+*/
+int mm_init(void){
 
     if ((heap_list_ptr = mem_sbrk(8*WORDSIZE)) == NULL) 
         return -1;
 
-    DEREF(heap_list_ptr) =  0;                            /* Alignment padding */
-    DEREF(heap_list_ptr + (1 * WORDSIZE))= (2*WORDSIZE | 1); /* Prologue header */ 
-    DEREF(heap_list_ptr + (2 * WORDSIZE))= (2*WORDSIZE | 1); /* Prologue footer */ 
-    DEREF(heap_list_ptr + (3 * WORDSIZE))= (0 | 1);     /* Epilogue header */
+    DEREF(heap_list_ptr) =  0;                                // Alignment padding
+    DEREF(heap_list_ptr + (1 * WORDSIZE))= (2*WORDSIZE | 1);  // Prologue header 
+    DEREF(heap_list_ptr + (2 * WORDSIZE))= (2*WORDSIZE | 1);  // Prologue footer 
+    DEREF(heap_list_ptr + (3 * WORDSIZE))= (0 | 1);           // Epilogue header 
     free_list_ptr = heap_list_ptr + 2*WORDSIZE; 
 
-    /* Extend the empty heap with a free block of minimum possible block size */
-    if (extend_heap(4) == NULL){ 
+    // add an empty heap with minimum size
+    if (extend_heap(BLOCKSIZE) == NULL){ 
         return -1;
     }
 
@@ -110,107 +102,85 @@ int mm_init(void)
 }
 
 /*
- * mm_malloc - Allocates a block of memory of memory of the given size aligned to 8-byte
- * boundaries.
- *
+ Allocate memory aligned to 8 bytes
+
  * A block is allocated according to this strategy:
  * (1) If a free block of the given size is found, then allocate that free block and return
  * a pointer to the payload of that block.
  * (2) Otherwise a free block could not be found, so an extension of the heap is necessary.
  * Simply extend the heap and allocate the allocated block in the new free block.
  */
-void *mm_malloc(size_t size)
-{  
-  
-  
-  size_t asize;       // Adjusted block size 
-  size_t extendsize;  // Amount to extend heap by if no fit 
-  char *block_ptr;
+void *mm_malloc(size_t size){  
+    size_t asize;       
+    size_t extendsize; 
+    char *block_ptr;
 
-  if (size == 0)
-      return NULL;
+    if (size == 0)
+        return NULL;
+    // add 2*WORDSIZE for header and footer
+    asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
+    
+    // find the free momory in the free list
+    if ((block_ptr = find_fit(asize))) {
+        allocate(block_ptr, asize);
+        return block_ptr;
+    }
 
+    // if there is no free memory, extend the heap
+    extendsize = MAX(asize, BLOCKSIZE);
+    if ((block_ptr = extend_heap(extendsize)) == NULL)
+        return NULL;
 
-  /* The size of the new block is equal to the size of the header and footer, plus
-   * the size of the payload. Or BLOCKSIZE if the requested size is smaller.
-   */
-  asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
-  
-  // Search the free list for the fit 
-  if ((block_ptr = find_fit(asize))) {
+    // allocate the memory of asize
     allocate(block_ptr, asize);
     return block_ptr;
-  }
-
-  // Otherwise, no fit was found. Grow the heap larger. 
-  extendsize = MAX(asize, BLOCKSIZE);
-  if ((block_ptr = extend_heap(extendsize/WORDSIZE)) == NULL)
-    return NULL;
-
-  // Place the newly allocated block
-  allocate(block_ptr, asize);
-
-  return block_ptr;
 }
 
 /*
- * mm_free - Frees the block being pointed to by block_ptr.
- *
- * Freeing a block is as simple as setting its allocated bit to 0. After
- * freeing the block, the free blocks should be coalesced to ensure high
- * memory utilization. 
+ * mm_free - free the block using block pointer.
  */
 void mm_free(void *block_ptr)
 { 
-  
-  // Ignore spurious requests 
   if (!block_ptr)
       return;
-
   size_t size = get_size(get_header(block_ptr));
 
-  /* Set the header and footer allocated bits to 0, thus
-   * freeing the block */
-  DEREF(get_header(block_ptr)) = (size | 0);
+  // set the allcate bit to zero
+  DEREF(get_header(block_ptr)) = (size | 0);  
   DEREF(get_footer(block_ptr)) = (size | 0);
 
-  // Coalesce to merge any free blocks and add them to the list 
+  // after freeing a block, coalesce the free blocks.
   coalesce(block_ptr);
 }
 
 /*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ * mm_realloc - use mm_malloc and mm_free
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-  // If ptr is NULL, realloc is equivalent to mm_malloc(size)
+  // if ptr is NULL, realloc is same as mm_malloc
   if (ptr == NULL)
     return mm_malloc(size);
 
-  // If size is equal to zero, realloc is equivalent to mm_free(ptr)
+  // If size is zero, realloc is same as mm_free
   if (size == 0) {
     mm_free(ptr);
     return NULL;
   }
     
-  /* Otherwise, we assume ptr is not NULL and was returned by an earlier malloc or realloc call.
-   * Get the size of the current payload */
-  size_t asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
-  size_t current_size = get_size(get_header(ptr));
+  size_t asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE); // adjust size
+  size_t current_size = get_size(get_header(ptr)); // current block size
 
   void *block_ptr;
-//   char *next = get_header(get_next_block(ptr));
-//   size_t newsize = current_size + get_size(next);
-
-  /* Case 1: Size is equal to the current payload size */
+  
+  // if the size is same, just return the ptr
   if (asize == current_size)
     return ptr;
 
-  // Case 2: Size is less than the current payload size 
-  if ( asize <= current_size ) {
-
+  // if size < current block size
+  if ( asize <= current_size ) {    
+    // check if splitting is available
     if( asize > BLOCKSIZE && (current_size - asize) > BLOCKSIZE) {  
-
       DEREF(get_header(ptr))= (asize | 1);
       DEREF(get_footer(ptr))= (asize | 1);
       block_ptr = get_next_block(ptr);
@@ -218,42 +188,17 @@ void *mm_realloc(void *ptr, size_t size)
       DEREF(get_footer(block_ptr))=((current_size - asize) | 1);
       mm_free(block_ptr);
       return ptr;
-
-    //    DEREF(get_header(block_ptr))= (asize | 1);
-    // DEREF(get_footer(block_ptr))= (asize | 1);
-    // remove_block_from_free_list(block_ptr);
-    // block_ptr = get_next_block(block_ptr);
-    // DEREF(get_header(block_ptr))= ((fsize-asize) | 0);
-    // DEREF(get_footer(block_ptr))= ((fsize-asize) | 0);
     }
 
-    // allocate a new block of the requested size and release the current block
+    // allocate a new block and fre the current block
     block_ptr = mm_malloc(asize);
     memcpy(block_ptr, ptr, asize);
     mm_free(ptr);
     return block_ptr;
   }
-
-  // Case 3: Requested size is greater than the current payload size 
+  // if size > current block size
   else {
-
-    // next block is unallocated and is large enough to complete the request
-    // merge current block with next block up to the size needed and free the 
-    // remaining block.
-    // if ( !get_is_alloc(next) && newsize >= asize ) {
-
-    //   // merge, split, and release
-    //   remove_block_from_free_list(get_next_block(ptr));
-    //   DEREF(get_header(ptr))= (asize | 1);
-    //   DEREF(get_footer(ptr))= (asize | 1);
-    //   block_ptr = get_next_block(ptr);
-    //   DEREF(get_header(block_ptr))=((newsize-asize) | 1);
-    //   DEREF(get_footer(block_ptr))=((newsize-asize) | 1);
-    //   mm_free(block_ptr);
-    //   return ptr;
-    // }  
-    
-    // otherwise allocate a new block of the requested size and release the current block
+    // allocate a new block and fre the current block
     block_ptr = mm_malloc(asize); 
     memcpy(block_ptr, ptr, current_size);
     mm_free(ptr);
@@ -264,17 +209,16 @@ void *mm_realloc(void *ptr, size_t size)
 
 
 /*
- * extend_heap - Extends the heap by the given number of words rounded up to the 
- * nearest even integer.
+ * extend_heap - extends the heap to the aligned size.
  */
-static void *extend_heap(size_t words)
+static void *extend_heap(size_t asize)
 {
   char *block_ptr;
   size_t asize;
 
   /* Adjust the size so the alignment and minimum block size requirements
    * are met. */ 
-  asize = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
+//   asize = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
   if (asize < BLOCKSIZE)
     asize = BLOCKSIZE;
   
