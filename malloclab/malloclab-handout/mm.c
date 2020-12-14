@@ -95,7 +95,7 @@ int mm_init(void)
       return -1; 
     DEREF(heap_list_ptr) = (0 | 1);           // Prologue header 
     DEREF(heap_list_ptr + WORDSIZE)=  (2*WORDSIZE | 0);           // Free block header 
-    DEREF(heap_list_ptr + (3*WORDSIZE))= (2*WORDSIZE | 0);                       // Space for next pointer 
+    DEREF(heap_list_ptr + (2*WORDSIZE))= (2*WORDSIZE | 0);                       // Space for next pointer 
     DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 1);                       // Space for prev pointer 
     // DEREF(heap_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
     // DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
