@@ -98,7 +98,6 @@ int mm_init(void){
  */
 void *mm_malloc(size_t size){  
     size_t adjust_size;       
-    size_t adjust_size; 
     char *block_ptr;
 
     if (size == 0)
