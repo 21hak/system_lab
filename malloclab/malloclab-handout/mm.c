@@ -90,7 +90,7 @@ void *mm_malloc(size_t size)
     if(size==0)
         return NULL;
 
-    need_size = (ALIGN(size) + 2 * WORDSIZE) > BLOCKSIZE ? (ALIGN(size) + 2 * WORDSIZE) : BLOCKSIZE;
+    need_size = ((ALIGN(size) + 2 * WORDSIZE) > BLOCKSIZE) ? (ALIGN(size) + 2 * WORDSIZE) : BLOCKSIZE;
     free_block_ptr = find_fit(need_size);     
     if(free_block_ptr){
         // while(1);
