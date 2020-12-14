@@ -106,7 +106,7 @@ void *mm_malloc(size_t size)
         allocate(free_block_ptr, need_size);
     }
     else{
-        free_block_ptr = extend_heap(ALIGN(need_size));
+        free_block_ptr = extend_heap(need_size/WORDSIZE);
         if(free_block_ptr == NULL)
             return NULL;
         allocate(free_block_ptr, need_size);
@@ -172,10 +172,15 @@ static void remove_block_from_free_list(void *block_ptr){
             PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
     }
 }
-static void* extend_heap(size_t size){
+static void* extend_heap(size_t words){
     char *free_block_ptr = NULL;
+    size_t size;
     if(size == 0)
         size = BLOCKSIZE;
+
+    size = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
+    if (size < BLOCKSIZE)
+    size = BLOCKSIZE;
 
     free_block_ptr = mem_sbrk(size);
     if(free_block_ptr == (void*)-1)
@@ -248,7 +253,7 @@ void mm_free(void *ptr)
 {
     if(ptr == NULL)
         return;
-    size_t size = DEREF(get_header(ptr)) & (~0x1);
+    size_t size = get_size(get_header(ptr));
     DEREF(get_header(ptr)) = size | 0;
     DEREF(get_footer(ptr)) = size | 0;
 
