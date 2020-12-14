@@ -83,8 +83,8 @@ static inline void* get_prev_block(void* block_ptr){
 static void *extend_heap(size_t words);
 static void *find_fit(size_t size);
 static void *coalesce(void *bp);
-static void place(void *bp, size_t asize);
-static void remove_freeblock(void *bp);
+// static void place(void *bp, size_t asize);
+// static void remove_freeblock(void *bp);
 
 
 
