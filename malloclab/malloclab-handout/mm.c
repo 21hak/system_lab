@@ -20,19 +20,13 @@
 
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
-
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
-
-
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
-#define INIT_SIZE 16
 #define BLOCKSIZE 16
-#define WORDSIZE       4 
+#define WORDSIZE 4 
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 #define DEREF(p) (*(size_t*)(p))
-
-#define PACK(size, alloc) ((size) | (alloc))
 #define NEXT_FREE(block_ptr) (*(void **)block_ptr)
 #define PREV_FREE(block_ptr) (*(void **)(block_ptr + WORDSIZE))
 
@@ -96,7 +90,6 @@ int mm_init(void){
     if (extend_heap(BLOCKSIZE) == NULL){ 
         return -1;
     }
-
   return 0;
 }
 
@@ -105,7 +98,7 @@ int mm_init(void){
  */
 void *mm_malloc(size_t size){  
     size_t adjust_size;       
-    size_t extendsize; 
+    size_t extend_size; 
     char *block_ptr;
 
     if (size == 0)
@@ -120,8 +113,8 @@ void *mm_malloc(size_t size){
     }
 
     // 해당 size의 free block이 없는 경우 extend heap
-    extendsize = MAX(adjust_size, BLOCKSIZE);
-    if ((block_ptr = extend_heap(extendsize)) == NULL)
+    extend_size = MAX(adjust_size, BLOCKSIZE);
+    if ((block_ptr = extend_heap(extend_size)) == NULL)
         return NULL;
 
     allocate(block_ptr, adjust_size);
