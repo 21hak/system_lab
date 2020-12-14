@@ -97,7 +97,7 @@ void *mm_malloc(size_t size)
         allocate(free_block_ptr, need_size);
     }
     else{
-        // while(1);
+         while(1);
         free_block_ptr = extend_heap(need_size);
         if(free_block_ptr == NULL)
             return NULL;
