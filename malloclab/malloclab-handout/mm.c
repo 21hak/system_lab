@@ -46,7 +46,7 @@
 #define FTRP(bp)     ((void *)(bp) + GET_SIZE(HDRP(bp)) - 2*WORDSIZE)
 
 // #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
-#define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WORDSIZE))
+// #define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WORDSIZE))
 
 /* 
  * mm_init - initialize the malloc package.
@@ -77,7 +77,7 @@ static inline void* get_next_block(void* block_ptr){
 }
 
 static inline void* get_prev_block(void* block_ptr){
-    return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE));
+    return ((void *)(block_ptr) - GET_SIZE(HDRP(block_ptr) - WORDSIZE));
 }
 
 static void *extend_heap(size_t words);
@@ -614,7 +614,7 @@ static void remove_freeblock(void *bp)
 static void *coalesce(void *bp)
 {
   // Determine the current allocation state of the previous and next blocks 
-  size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))) || PREV_BLKP(bp) == bp;
+  size_t prev_alloc = GET_ALLOC(FTRP(get_prev_block(bp))) || get_prev_block(bp) == bp;
   size_t next_alloc = GET_ALLOC(HDRP(get_next_block(bp)));
 
   // Get the size of the current free block
@@ -632,8 +632,8 @@ static void *coalesce(void *bp)
   /* If the previous block is free, then coalesce the current
    * block (bp) and the previous block */
   else if (!prev_alloc && next_alloc) {      // Case 3 (in text) 
-    size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-    bp = PREV_BLKP(bp); 
+    size += GET_SIZE(HDRP(get_prev_block(bp)));
+    bp = get_prev_block(bp); 
     remove_freeblock(bp);
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -642,11 +642,11 @@ static void *coalesce(void *bp)
   /* If the previous block and next block are free, coalesce
    * both */
   else if (!prev_alloc && !next_alloc) {     // Case 4 (in text) 
-    size += GET_SIZE(HDRP(PREV_BLKP(bp))) + 
+    size += GET_SIZE(HDRP(get_prev_block(bp))) + 
             GET_SIZE(HDRP(get_next_block(bp)));
-    remove_freeblock(PREV_BLKP(bp));
+    remove_freeblock(get_prev_block(bp));
     remove_freeblock(get_next_block(bp));
-    bp = PREV_BLKP(bp);
+    bp = get_prev_block(bp);
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
   }
