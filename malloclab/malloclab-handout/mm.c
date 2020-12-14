@@ -158,19 +158,14 @@ static void allocate(void* block_ptr, size_t size){
 }
 
 static void remove_block_from_free_list(void *block_ptr){
-    if(block_ptr==NULL)
-        return;
-    if(PREV_FREE(block_ptr) != NULL){
-        NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr);
-    }
-    else
-    {
-      free_list_ptr = NEXT_FREE(block_ptr);
-    } 
-    if(NEXT_FREE(block_ptr)!=NULL){
-        if(PREV_FREE(block_ptr))
-            PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
-    }
+    if(block_ptr) {
+        if (PREV_FREE(block_ptr))
+            NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr);
+        else
+            free_list_ptr = NEXT_FREE(block_ptr);
+    if(NEXT_FREE(block_ptr) != NULL)
+        PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
+  }
 }
 static void* extend_heap(size_t words){
     char *free_block_ptr = NULL;
@@ -192,7 +187,7 @@ static void* extend_heap(size_t words){
 
     DEREF(get_header(free_block_ptr)) = size | 0;
     DEREF(get_footer(free_block_ptr)) = size | 0;
-    DEREF(get_next_block(free_block_ptr)) = 0 | 1;
+    DEREF(get_header(get_next_block(free_block_ptr))) = 0 | 1;
 
     coalesce(free_block_ptr);
     return free_block_ptr;
@@ -249,15 +244,15 @@ static void* coalesce(void* block_ptr){
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *ptr)
+void mm_free(void *block_ptr)
 {
-    if(ptr == NULL)
+    if(block_ptr == NULL)
         return;
-    size_t size = get_size(get_header(ptr));
-    DEREF(get_header(ptr)) = size | 0;
-    DEREF(get_footer(ptr)) = size | 0;
+    size_t size = get_size(get_header(block_ptr));
+    DEREF(get_header(block_ptr)) = size | 0;
+    DEREF(get_footer(block_ptr)) = size | 0;
 
-    coalesce(ptr);
+    coalesce(block_ptr);
 }
 
 
