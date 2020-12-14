@@ -85,7 +85,7 @@ int mm_init(void)
     DEREF(heap_ptr + 3 * WORDSIZE) = 0 | 0;
     DEREF(heap_ptr + 4 * WORDSIZE) = BLOCKSIZE | 0;
     DEREF(heap_ptr + 5 * WORDSIZE) = 0 | 1;
-    free_list_ptr = heap_ptr + 2 * WORDSIZE;
+    free_list_ptr = heap_ptr +  WORDSIZE;
     return 0;
 }
 
@@ -118,15 +118,25 @@ void *mm_malloc(size_t size)
  * find_fit
 */
 static void *find_fit(size_t size){
-    void* free_block_ptr = free_list_ptr;
-    while((free_block_ptr!=NULL) && (size>get_size(free_block_ptr))){
-        free_block_ptr = NEXT_FREE(free_block_ptr);
-    }
-    // for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
-    //     if(size <= get_size(free_block_ptr))
-    //         return free_block_ptr;
+    // void* free_block_ptr = free_list_ptr;
+    // while((free_block_ptr!=NULL) && (size>get_size(free_block_ptr))){
+    //     free_block_ptr = NEXT_FREE(free_block_ptr);
     // }
-    return free_block_ptr;
+    // // for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
+    // //     if(size <= get_size(free_block_ptr))
+    // //         return free_block_ptr;
+    // // }
+    // return free_block_ptr;
+    void *block_ptr;
+
+    /* Iterate through the free list and try to find a free block
+    * large enough */
+    for (block_ptr = free_list_ptr; get_is_alloc(get_header(block_ptr)) == 0; bp = NEXT_FREE(bp)) {
+        if (size <= get_size(get_header(block_ptr))) 
+        return block_ptr; 
+    }
+    // Otherwise no free block was large enough
+    return NULL; 
 }
 
 static void allocate(void* block_ptr, size_t size){
