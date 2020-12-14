@@ -72,29 +72,34 @@ static inline void* get_prev_block(void* block_ptr){
 
 static void *extend_heap(size_t words);
 static void *find_fit(size_t size);
-static void *coalesce(void *bp);
-static void allocate(void *bp, size_t asize);
-static void remove_block_from_free_list(void *bp);
+static void *coalesce(void *block_ptr);
+static void allocate(void *block_ptr, size_t asize);
+static void remove_block_from_free_list(void *block_ptr);
 
 
 int mm_init(void)
 {
-  // Initialize the heap with freelist prologue/epilogoue and space for the
-  // initial free block. (32 bytes total)
-  if ((heap_list_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE)) == (void *)-1)
-      return -1; 
-  DEREF(heap_list_ptr) = (BLOCKSIZE | 1);           // Prologue header 
-  DEREF(heap_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
+//   if ((heap_list_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE)) == (void *)-1)
+//       return -1; 
+//   DEREF(heap_list_ptr) = (BLOCKSIZE | 1);           // Prologue header 
+//   DEREF(heap_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
+//   DEREF(heap_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
+//   DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
+//   DEREF(heap_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
+//   DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
 
-  DEREF(heap_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
-  DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
-  DEREF(heap_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
-  DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
-
-  // Point free_list to the first header of the first free block
-  free_list_ptr = heap_list_ptr + (WORDSIZE);
-
-  return 0;
+//   free_list_ptr = heap_list_ptr + (WORDSIZE);
+    if ((free_list_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE)) == (void *)-1)
+        return -1; 
+    // DEREF(heap_list_ptr) = (BLOCKSIZE | 1);           // Prologue header 
+    DEREF(heap_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
+    DEREF(heap_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
+    DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
+    DEREF(heap_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
+    // DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
+    free_list_ptr = free_list_ptr + WORDSIZE;
+    // free_list_ptr = heap_list_ptr + (WORDSIZE);
+    return 0;
 }
 
 /*
@@ -115,7 +120,7 @@ void *mm_malloc(size_t size)
 
   size_t asize;       // Adjusted block size 
   size_t extendsize;  // Amount to extend heap by if no fit 
-  char *bp;
+  char *block_ptr;
 
   /* The size of the new block is equal to the size of the header and footer, plus
    * the size of the payload. Or BLOCKSIZE if the requested size is smaller.
@@ -123,45 +128,45 @@ void *mm_malloc(size_t size)
   asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
   
   // Search the free list for the fit 
-  if ((bp = find_fit(asize))) {
-    allocate(bp, asize);
-    return bp;
+  if ((block_ptr = find_fit(asize))) {
+    allocate(block_ptr, asize);
+    return block_ptr;
   }
 
   // Otherwise, no fit was found. Grow the heap larger. 
   extendsize = MAX(asize, BLOCKSIZE);
-  if ((bp = extend_heap(extendsize/WORDSIZE)) == NULL)
+  if ((block_ptr = extend_heap(extendsize/WORDSIZE)) == NULL)
     return NULL;
 
   // Place the newly allocated block
-  allocate(bp, asize);
+  allocate(block_ptr, asize);
 
-  return bp;
+  return block_ptr;
 }
 
 /*
- * mm_free - Frees the block being pointed to by bp.
+ * mm_free - Frees the block being pointed to by block_ptr.
  *
  * Freeing a block is as simple as setting its allocated bit to 0. After
  * freeing the block, the free blocks should be coalesced to ensure high
  * memory utilization. 
  */
-void mm_free(void *bp)
+void mm_free(void *block_ptr)
 { 
   
   // Ignore spurious requests 
-  if (!bp)
+  if (!block_ptr)
       return;
 
-  size_t size = get_size(get_header(bp));
+  size_t size = get_size(get_header(block_ptr));
 
   /* Set the header and footer allocated bits to 0, thus
    * freeing the block */
-  DEREF(get_header(bp)) = (size | 0);
-  DEREF(get_footer(bp)) = (size | 0);
+  DEREF(get_header(block_ptr)) = (size | 0);
+  DEREF(get_footer(block_ptr)) = (size | 0);
 
   // Coalesce to merge any free blocks and add them to the list 
-  coalesce(bp);
+  coalesce(block_ptr);
 }
 
 /*
@@ -184,7 +189,7 @@ void *mm_realloc(void *ptr, size_t size)
   size_t asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
   size_t current_size = get_size(get_header(ptr));
 
-  void *bp;
+  void *block_ptr;
   char *next = get_header(get_next_block(ptr));
   size_t newsize = current_size + get_size(next);
 
@@ -199,18 +204,18 @@ void *mm_realloc(void *ptr, size_t size)
 
       DEREF(get_header(ptr))= (asize | 1);
       DEREF(get_footer(ptr))= (asize | 1);
-      bp = get_next_block(ptr);
-      DEREF(get_header(bp))=((current_size - asize) | 1);
-      DEREF(get_footer(bp))=((current_size - asize) | 1);
-      mm_free(bp);
+      block_ptr = get_next_block(ptr);
+      DEREF(get_header(block_ptr))=((current_size - asize) | 1);
+      DEREF(get_footer(block_ptr))=((current_size - asize) | 1);
+      mm_free(block_ptr);
       return ptr;
     }
 
     // allocate a new block of the requested size and release the current block
-    bp = mm_malloc(asize);
-    memcpy(bp, ptr, asize);
+    block_ptr = mm_malloc(asize);
+    memcpy(block_ptr, ptr, asize);
     mm_free(ptr);
-    return bp;
+    return block_ptr;
   }
 
   // Case 3: Requested size is greater than the current payload size 
@@ -225,18 +230,18 @@ void *mm_realloc(void *ptr, size_t size)
       remove_block_from_free_list(get_next_block(ptr));
       DEREF(get_header(ptr))= (asize | 1);
       DEREF(get_footer(ptr))= (asize | 1);
-      bp = get_next_block(ptr);
-      DEREF(get_header(bp))=((newsize-asize) | 1);
-      DEREF(get_footer(bp))=((newsize-asize) | 1);
-      mm_free(bp);
+      block_ptr = get_next_block(ptr);
+      DEREF(get_header(block_ptr))=((newsize-asize) | 1);
+      DEREF(get_footer(block_ptr))=((newsize-asize) | 1);
+      mm_free(block_ptr);
       return ptr;
     }  
     
     // otherwise allocate a new block of the requested size and release the current block
-    bp = mm_malloc(asize); 
-    memcpy(bp, ptr, current_size);
+    block_ptr = mm_malloc(asize); 
+    memcpy(block_ptr, ptr, current_size);
     mm_free(ptr);
-    return bp;
+    return block_ptr;
   }
 
 }
@@ -248,7 +253,7 @@ void *mm_realloc(void *ptr, size_t size)
  */
 static void *extend_heap(size_t words)
 {
-  char *bp;
+  char *block_ptr;
   size_t asize;
 
   /* Adjust the size so the alignment and minimum block size requirements
@@ -258,17 +263,17 @@ static void *extend_heap(size_t words)
     asize = BLOCKSIZE;
   
   // Attempt to grow the heap by the adjusted size 
-  if ((bp = mem_sbrk(asize)) == (void *)-1)
+  if ((block_ptr = mem_sbrk(asize)) == (void *)-1)
     return NULL;
 
   /* Set the header and footer of the newly created free block, and
    * push the epilogue header to the back */
-  DEREF(get_header(bp))= (asize | 0);
-  DEREF(get_footer(bp))=(asize | 0);
-  DEREF(get_header(get_next_block(bp)))=(0 | 1); /* Move the epilogue to the end */
+  DEREF(get_header(block_ptr))= (asize | 0);
+  DEREF(get_footer(block_ptr))=(asize | 0);
+  DEREF(get_header(get_next_block(block_ptr)))=(0 | 1); /* Move the epilogue to the end */
 
   // Coalesce any partitioned free memory 
-  return coalesce(bp); 
+  return coalesce(block_ptr); 
 }
 
 /*
@@ -280,99 +285,104 @@ static void *extend_heap(size_t words)
 static void *find_fit(size_t size)
 {
   // First-fit search 
-  void *bp;
+  void *block_ptr = free_list_ptr;
 
   /* Iterate through the free list and try to find a free block
    * large enough */
-  for (bp = free_list_ptr; get_is_alloc(get_header(bp)) == 0; bp = NEXT_FREE(bp)) {
-    if (size <= get_size(get_header(bp))) 
-      return bp; 
-  }
+//   for (block_ptr = free_list_ptr; get_is_alloc(get_header(block_ptr)) == 0; block_ptr = NEXT_FREE(block_ptr)) {
+//     if (size <= get_size(get_header(block_ptr))) 
+//       return block_ptr; 
+//   }
+    while(block_ptr!=NULL){
+        if(size <= get_size(block_ptr))
+            break;
+        block_ptr = NEXT_FREE(block_ptr);
+    }
   // Otherwise no free block was large enough
   return NULL; 
 }
 
 /*
- * remove_block_from_free_list - Removes the given free block pointed to by bp from the free list.
+ * remove_block_from_free_list - Removes the given free block pointed to by block_ptr from the free list.
  * 
  * The explicit free list is simply a doubly linked list. This function performs a removal
  * of the block from the doubly linked free list.
  */
-static void remove_block_from_free_list(void *bp)
+static void remove_block_from_free_list(void *block_ptr)
 {
-  if(bp) {
-    if (PREV_FREE(bp))
-      NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
+  if(block_ptr) {
+    if (PREV_FREE(block_ptr))
+      NEXT_FREE(PREV_FREE(block_ptr)) = NEXT_FREE(block_ptr);
     else
-      free_list_ptr = NEXT_FREE(bp);
-    if(NEXT_FREE(bp) != NULL)
-      PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
+      free_list_ptr = NEXT_FREE(block_ptr);
+    if(NEXT_FREE(block_ptr) != NULL)
+      PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
   }
 }
 
 
 
 /*
- * coalesce - Coalesces the memory surrounding block bp using the Boundary Tag strategy
+ * coalesce - Coalesces the memory surrounding block block_ptr using the Boundary Tag strategy
  * proposed in the text (Page 851, Section 9.9.11).
  * 
  * Adjancent blocks which are free are merged together and the aggregate free block
  * is added to the free list. Any individual free blocks which were merged are removed
  * from the free list.
  */
-static void *coalesce(void *bp)
+static void *coalesce(void *block_ptr)
 {
   // Determine the current allocation state of the previous and next blocks 
-  size_t prev_alloc = get_is_alloc(get_footer(get_prev_block(bp))) || get_prev_block(bp) == bp;
-  size_t next_alloc = get_is_alloc(get_header(get_next_block(bp)));
+  size_t prev_alloc = get_is_alloc(get_footer(get_prev_block(block_ptr))) || get_prev_block(block_ptr) == block_ptr;
+  size_t next_alloc = get_is_alloc(get_header(get_next_block(block_ptr)));
 
   // Get the size of the current free block
-  size_t size = get_size(get_header(bp));
+  size_t size = get_size(get_header(block_ptr));
 
   /* If the next block is free, then coalesce the current block
-   * (bp) and the next block */
+   * (block_ptr) and the next block */
   if (prev_alloc && !next_alloc) {           // Case 2 (in text) 
-    size += get_size(get_header(get_next_block(bp)));  
-    remove_block_from_free_list(get_next_block(bp));
-    DEREF(get_header(bp))= (size | 0);
-    DEREF(get_footer(bp))= (size | 0);
+    size += get_size(get_header(get_next_block(block_ptr)));  
+    remove_block_from_free_list(get_next_block(block_ptr));
+    DEREF(get_header(block_ptr))= (size | 0);
+    DEREF(get_footer(block_ptr))= (size | 0);
   }
 
   /* If the previous block is free, then coalesce the current
-   * block (bp) and the previous block */
+   * block (block_ptr) and the previous block */
   else if (!prev_alloc && next_alloc) {      // Case 3 (in text) 
-    size += get_size(get_header(get_prev_block(bp)));
-    bp = get_prev_block(bp); 
-    remove_block_from_free_list(bp);
-    DEREF(get_header(bp))= (size | 0);
-    DEREF(get_footer(bp))= (size | 0);
+    size += get_size(get_header(get_prev_block(block_ptr)));
+    block_ptr = get_prev_block(block_ptr); 
+    remove_block_from_free_list(block_ptr);
+    DEREF(get_header(block_ptr))= (size | 0);
+    DEREF(get_footer(block_ptr))= (size | 0);
   } 
 
   /* If the previous block and next block are free, coalesce
    * both */
   else if (!prev_alloc && !next_alloc) {     // Case 4 (in text) 
-    size += get_size(get_header(get_prev_block(bp))) + 
-            get_size(get_header(get_next_block(bp)));
-    remove_block_from_free_list(get_prev_block(bp));
-    remove_block_from_free_list(get_next_block(bp));
-    bp = get_prev_block(bp);
-    DEREF(get_header(bp))= (size | 0);
-    DEREF(get_footer(bp))= (size | 0);
+    size += get_size(get_header(get_prev_block(block_ptr))) + 
+            get_size(get_header(get_next_block(block_ptr)));
+    remove_block_from_free_list(get_prev_block(block_ptr));
+    remove_block_from_free_list(get_next_block(block_ptr));
+    block_ptr = get_prev_block(block_ptr);
+    DEREF(get_header(block_ptr))= (size | 0);
+    DEREF(get_footer(block_ptr))= (size | 0);
   }
 
   // Insert the coalesced block at the front of the free list 
-  NEXT_FREE(bp) = free_list_ptr;
-  PREV_FREE(free_list_ptr) = bp;
-  PREV_FREE(bp) = NULL;
-  free_list_ptr = bp;
+  NEXT_FREE(block_ptr) = free_list_ptr;
+  PREV_FREE(free_list_ptr) = block_ptr;
+  PREV_FREE(block_ptr) = NULL;
+  free_list_ptr = block_ptr;
 
   // Return the coalesced block 
-  return bp;
+  return block_ptr;
 }
 
 /*
  * allocate - Places a block of the given size in the free block pointed to by the given
- * pointer bp.
+ * pointer block_ptr.
  *
  * This placement is done using a split strategy. If the difference between the size of block 
  * being allocated (asize) and the total size of the free block (fsize) is greater than or equal
@@ -380,86 +390,28 @@ static void *coalesce(void *bp)
  * allocated block of size asize, and the second block is the remaining free block with a size
  * corresponding to the difference between the two block sizes.  
  */
-static void allocate(void *bp, size_t asize)
+static void allocate(void *block_ptr, size_t asize)
 {  
   // Gets the total size of the free block 
-  size_t fsize = get_size(get_header(bp));
+  size_t fsize = get_size(get_header(block_ptr));
 
   // Case 1: Splitting is performed 
   if((fsize - asize) >= (BLOCKSIZE)) {
 
-    DEREF(get_header(bp))= (asize | 1);
-    DEREF(get_footer(bp))= (asize | 1);
-    remove_block_from_free_list(bp);
-    bp = get_next_block(bp);
-    DEREF(get_header(bp))= ((fsize-asize) | 0);
-    DEREF(get_footer(bp))= ((fsize-asize) | 0);
-    coalesce(bp);
+    DEREF(get_header(block_ptr))= (asize | 1);
+    DEREF(get_footer(block_ptr))= (asize | 1);
+    remove_block_from_free_list(block_ptr);
+    block_ptr = get_next_block(block_ptr);
+    DEREF(get_header(block_ptr))= ((fsize-asize) | 0);
+    DEREF(get_footer(block_ptr))= ((fsize-asize) | 0);
+    coalesce(block_ptr);
   }
 
   // Case 2: Splitting not possible. Use the full free block 
   else {
 
-    DEREF(get_header(bp))= (fsize | 1);
-    DEREF(get_footer(bp))= (fsize | 1);
-    remove_block_from_free_list(bp);
+    DEREF(get_header(block_ptr))= (fsize | 1);
+    DEREF(get_footer(block_ptr))= (fsize | 1);
+    remove_block_from_free_list(block_ptr);
   }
 }
-
-// consistency checker
-
-// static int mm_check() {
-
-//   // Is every block in the free list marked as free?
-//   void *next;
-//   for (next = free_list_ptr; get_is_alloc(get_header(next)) == 0; next = NEXT_FREE(next)) {
-//     if (get_is_alloc(get_header(next))) {
-//       printf("Consistency error: block %p in free list but marked allocated!", next);
-//       return 1;
-//     }
-//   }
-
-//   // Are there any contiguous free blocks that escaped coalescing?
-//   for (next = free_list_ptr; get_is_alloc(get_header(next)) == 0; next = NEXT_FREE(next)) {
-
-//     char *prev = PREV_FREE(get_header(next));
-//       if(prev != NULL && get_header(next) - get_footer(prev) == 2*WORDSIZE) {
-//         printf("Consistency error: block %p missed coalescing!", next);
-//         return 1;
-//       }
-//   }
-
-//   // Do the pointers in the free list point to valid free blocks?
-//   for (next = free_list_ptr; get_is_alloc(get_header(next)) == 0; next = NEXT_FREE(next)) {
-
-//     if(next < mem_heap_lo() || next > mem_heap_hi()) {
-//       printf("Consistency error: free block %p invalid", next);
-//       return 1;
-//     }
-//   }
-
-//   // Do the pointers in a heap block point to a valid heap address?
-//   for (next = heap_list_ptr; get_next_block(next) != NULL; next = get_next_block(next)) {
-
-//     if(next < mem_heap_lo() || next > mem_heap_hi()) {
-//       printf("Consistency error: block %p outside designated heap space", next);
-//       return 1;
-//     }
-//   }
-
-//   return 0;
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
