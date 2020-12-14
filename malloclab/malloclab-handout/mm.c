@@ -299,7 +299,7 @@ static void *find_fit(size_t size)
         block_ptr = NEXT_FREE(block_ptr);
     }
   // Otherwise no free block was large enough
-  return NULL; 
+  return block_ptr; 
 }
 
 /*
