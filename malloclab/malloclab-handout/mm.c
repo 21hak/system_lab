@@ -74,7 +74,7 @@ int mm_init(void)
     DEREF(heap_ptr + 2*WORDSIZE) = 0 | 0;
     DEREF(heap_ptr + 3*WORDSIZE) = 0 | 0;
     DEREF(heap_ptr + 4*WORDSIZE) = BLOCKSIZE | 0;
-    DEREF(heap_ptr + 5*WORDSIZE) = BLOCKSIZE | 1;
+    DEREF(heap_ptr + 5*WORDSIZE) = 0 | 1;
     free_list_ptr = heap_ptr + WORDSIZE;
     return 0;
 }
@@ -114,7 +114,7 @@ static void *find_fit(size_t size){
 
     while((free_block_ptr!=NULL) && (size>get_size(free_block_ptr))){
         free_block_ptr = NEXT_FREE(free_block_ptr);
-
+        while(1);
     }
     // for (free_block_ptr = free_list_ptr; free_block_ptr != NULL; free_block_ptr = NEXT_FREE(free_block_ptr) ){
     //     if(size <= get_size(free_block_ptr))
@@ -143,6 +143,20 @@ static void allocate(void* block_ptr, size_t size){
         remove_block_from_free_list(block_ptr);
     }
 
+    size_t total_size = get_size(block_ptr);
+     if(total_size >= size + BLOCKSIZE){
+         DEREF(get_header(block_ptr)) = size | 1;
+         DEREF(get_footer(block_ptr)) = size | 1;
+         remove_block_from_free_list(block_ptr);
+         block_ptr = block_ptr + get_size(block_ptr);
+         DEREF(get_header(block_ptr)) = (total_size - size) | 0;
+         DEREF(get_footer(block_ptr)) = (total_size - size) | 0;
+     }
+     else{
+         DEREF(get_header(block_ptr)) = BLOCKSIZE | 1;
+         DEREF(get_footer(block_ptr)) = BLOCKSIZE | 1;
+         remove_block_from_free_list(block_ptr);
+     }
     
     
 }
@@ -177,7 +191,7 @@ static void* extend_heap(size_t size){
     DEREF(*ptr) = need_size | 0;
 
     *ptr = get_header(free_block_ptr);
-    DEREF(get_header(*ptr + need_size)) = BLOCKSIZE |1;
+    DEREF(get_header(*ptr + need_size)) = 0 |1;
     coalesce(free_block_ptr);
     return free_block_ptr;
 }
