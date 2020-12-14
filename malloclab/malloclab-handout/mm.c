@@ -172,6 +172,9 @@ static void* extend_heap(size_t size){
 
     *ptr = get_header(free_block_ptr);
     DEREF(get_header(*ptr + need_size)) = 0 |1;
+
+    NEXT_FREE(free_block_ptr) = free_list_ptr + WORDSIZE;
+    PREV_FREE(free_list_ptr + WORDSIZE) = free_block_ptr;
     coalesce(free_block_ptr);
     return free_block_ptr;
 }
