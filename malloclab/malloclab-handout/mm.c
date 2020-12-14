@@ -181,7 +181,7 @@ static void allocate(void* block_ptr, size_t size){
     //      remove_block_from_free_list(block_ptr);
     //  }
 
-    size_t fsize = GET_SIZE(HDRP(block_ptr));
+    size_t fsize = get_size(get_header(block_ptr));
 
     // Case 1: Splitting is performed 
     if((fsize - size) >= (BLOCKSIZE)) {
