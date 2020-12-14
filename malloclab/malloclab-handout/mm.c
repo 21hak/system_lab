@@ -253,15 +253,15 @@ static void insert_block_to_free_list(void *block_ptr){
  */
 static void *coalesce(void *block_ptr)
 {
-    size_t prev_alloc = get_is_alloc(get_footer(get_prev_block(block_ptr))) || get_prev_block(block_ptr) == block_ptr;
-    size_t next_alloc = get_is_alloc(get_header(get_next_block(block_ptr)));
+    size_t prev_alloc_bit = get_is_alloc(get_footer(get_prev_block(block_ptr))) || get_prev_block(block_ptr) == block_ptr;
+    size_t next_alloc_bit = get_is_alloc(get_header(get_next_block(block_ptr)));
 
     size_t size = get_size(get_header(block_ptr));
 
     /* 다음 block만 free한 경우
      * total size = current block size + next block size 
      */
-    if (prev_alloc && !next_alloc) {
+    if (prev_alloc_bit && !next_alloc_bit) {
         size += get_size(get_header(get_next_block(block_ptr)));
         remove_block_from_free_list(get_next_block(block_ptr));
         DEREF(get_header(block_ptr))= (size | 0);
@@ -271,7 +271,7 @@ static void *coalesce(void *block_ptr)
     /* 이전 block만 free한 경우
     *  total size = current block size + previous block size 
     */
-    else if (!prev_alloc && next_alloc) {      
+    else if (!prev_alloc_bit && next_alloc_bit) {      
         size += get_size(get_header(get_prev_block(block_ptr)));
         block_ptr = get_prev_block(block_ptr); // block pointer을 업데이트
         remove_block_from_free_list(block_ptr);
@@ -281,7 +281,7 @@ static void *coalesce(void *block_ptr)
 
     /* 이전, 다음 모두 free한 경우
     * both */
-    else if (!prev_alloc && !next_alloc) {
+    else if (!prev_alloc_bit && !next_alloc_bit) {
         size += get_size(get_header(get_prev_block(block_ptr))) + 
                 get_size(get_header(get_next_block(block_ptr)));
         remove_block_from_free_list(get_prev_block(block_ptr));
