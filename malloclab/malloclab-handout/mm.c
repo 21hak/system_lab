@@ -29,6 +29,7 @@
 #define INIT_SIZE 16
 #define BLOCKSIZE 16
 #define WORDSIZE 4
+#define MAX(x, y) ((x) > (y)? (x) : (y))
 #define DEREF(p) (*(size_t*)(p))
 #define NEXT_FREE(block_ptr) (*(void **)block_ptr)
 #define PREV_FREE(block_ptr) (*(void **)(block_ptr + WORDSIZE))
@@ -48,29 +49,26 @@ static inline size_t get_is_alloc(void* header_ptr){
 }
 
 static inline void *get_header(void* block_ptr){
-    return block_ptr - WORDSIZE;
+    return  ((void *)(block_ptr) - WORDSIZE)
 }
 
 static inline void* get_footer(void* block_ptr){
-    return block_ptr + (get_size(get_header(block_ptr)) - 2 * WORDSIZE);
+    return  ((void *)(block_ptr) + get_size(get_header(block_ptr)) - 2*WORDSIZE);
 }
 
 static inline void* get_next_block(void* block_ptr){
-    return block_ptr + get_size(get_header(block_ptr));
+    return ((void *)(block_ptr) + get_size(get_header(block_ptr)))
 }
 
 static inline void* get_prev_block(void* block_ptr){
-    return block_ptr - get_size(get_header(block_ptr) - WORDSIZE);
+    return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE))
 }
 
 
 static void *find_fit(size_t size);
-
 static void allocate(void* block_ptr, size_t size);
-
 static void remove_block_from_free_list(void *block_ptr);
 static void* extend_heap(size_t size);
-
 static void* coalesce(void* ptr);
 
 
@@ -95,23 +93,50 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    size_t need_size;
-    char *free_block_ptr = NULL;
-    if(size == 0)
+    // size_t need_size;
+    // char *free_block_ptr = NULL;
+    // if(size == 0)
+    //     return NULL;
+
+    // need_size = ((ALIGN(size) + 2 * WORDSIZE) > BLOCKSIZE) ? (ALIGN(size) + 2 * WORDSIZE) : BLOCKSIZE;
+    // free_block_ptr = find_fit(need_size);     
+    // if(free_block_ptr){
+    //     allocate(free_block_ptr, need_size);
+    // }
+    // else{
+    //     free_block_ptr = extend_heap(need_size/WORDSIZE);
+    //     if(free_block_ptr == NULL)
+    //         return NULL;
+    //     allocate(free_block_ptr, need_size);
+    // }
+    // return free_block_ptr;
+    if (size == 0)
+      return NULL;
+
+    size_t asize;       // Adjusted block size 
+    size_t extendsize;  // Amount to extend heap by if no fit 
+    char *block_ptr;
+
+    /* The size of the new block is equal to the size of the header and footer, plus
+    * the size of the payload. Or BLOCKSIZE if the requested size is smaller.
+    */
+    asize = MAX(ALIGN(size) + 2*WORDSIZE, BLOCKSIZE);
+    
+    // Search the free list for the fit 
+    if ((block_ptr = find_fit(asize))) {
+        allocate(block_ptr, asize);
+        return block_ptr;
+    }
+
+    // Otherwise, no fit was found. Grow the heap larger. 
+    extendsize = MAX(asize, BLOCKSIZE);
+    if ((block_ptr = extend_heap(extendsize/WORDSIZE)) == NULL)
         return NULL;
 
-    need_size = ((ALIGN(size) + 2 * WORDSIZE) > BLOCKSIZE) ? (ALIGN(size) + 2 * WORDSIZE) : BLOCKSIZE;
-    free_block_ptr = find_fit(need_size);     
-    if(free_block_ptr){
-        allocate(free_block_ptr, need_size);
-    }
-    else{
-        free_block_ptr = extend_heap(need_size/WORDSIZE);
-        if(free_block_ptr == NULL)
-            return NULL;
-        allocate(free_block_ptr, need_size);
-    }
-    return free_block_ptr;
+    // Place the newly allocated block
+    allocate(block_ptr, asize);
+
+    return block_ptr;
 }
 
 /*
