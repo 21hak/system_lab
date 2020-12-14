@@ -40,26 +40,32 @@
 static char *heap_list_ptr = 0;  
 static char *free_list_ptr = 0;  
 
+// get size of the block
 static inline size_t get_size(void *header_ptr){
     return DEREF(header_ptr) & (~0x1);
 }
 
+// get alloc bit of the block
 static inline size_t get_is_alloc(void* header_ptr){
     return DEREF(header_ptr) & (0x1);
 }
 
+// get header pointer of the block
 static inline void *get_header(void* block_ptr){
     return  ((void *)(block_ptr) - WORDSIZE);
 }
 
+// get footer pointer of the block
 static inline void* get_footer(void* block_ptr){
     return  ((void *)(block_ptr) + get_size(get_header(block_ptr)) - 2*WORDSIZE);
 }
 
+// get next block pointer
 static inline void* get_next_block(void* block_ptr){
     return ((void *)(block_ptr) + get_size(get_header(block_ptr)));
 }
 
+// get previous block pointer
 static inline void* get_prev_block(void* block_ptr){
     return ((void *)(block_ptr) - get_size(get_header(block_ptr) - WORDSIZE));
 }
