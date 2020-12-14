@@ -71,7 +71,7 @@ static inline void* get_prev_block(void* block_ptr){
 }
 
 // static void *extend_heap(size_t words);
-static void *extend_heap(size_t asize)
+static void *extend_heap(size_t asize);
 static void *find_fit(size_t size);
 static void *coalesce(void *block_ptr);
 static void allocate(void *block_ptr, size_t asize);
@@ -214,7 +214,7 @@ void *mm_realloc(void *ptr, size_t size)
 static void *extend_heap(size_t asize)
 {
   char *block_ptr;
-  size_t asize;
+  //size_t asize;
 
   /* Adjust the size so the alignment and minimum block size requirements
    * are met. */ 
