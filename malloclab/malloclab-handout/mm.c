@@ -136,8 +136,6 @@ static void allocate(void* block_ptr, size_t size){
          DEREF(get_footer(block_ptr)) = BLOCKSIZE | 1;
          remove_block_from_free_list(block_ptr);
      }
-    
-    
 }
 
 static void remove_block_from_free_list(void *block_ptr){
@@ -153,7 +151,7 @@ static void remove_block_from_free_list(void *block_ptr){
     if(NEXT_FREE(block_ptr)!=NULL){
         if(PREV_FREE(block_ptr))
             PREV_FREE(NEXT_FREE(block_ptr)) = PREV_FREE(block_ptr);
-    }    
+    }
 }
 static void* extend_heap(size_t size){
     size_t need_size = ALIGN(size);
