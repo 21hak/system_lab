@@ -98,7 +98,7 @@ int mm_init(void){
  */
 void *mm_malloc(size_t size){  
     size_t adjust_size;       
-    size_t extend_size; 
+    size_t adjust_size; 
     char *block_ptr;
 
     if (size == 0)
@@ -113,8 +113,7 @@ void *mm_malloc(size_t size){
     }
 
     // 해당 size의 free block이 없는 경우 extend heap
-    extend_size = MAX(adjust_size, BLOCKSIZE);
-    if ((block_ptr = extend_heap(extend_size)) == NULL)
+    if ((block_ptr = extend_heap(adjust_size)) == NULL)
         return NULL;
 
     allocate(block_ptr, adjust_size);
