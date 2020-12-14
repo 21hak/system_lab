@@ -131,7 +131,7 @@ static void *find_fit(size_t size){
 
     /* Iterate through the free list and try to find a free block
     * large enough */
-    for (block_ptr = free_list_ptr; get_is_alloc(get_header(block_ptr)) == 0; bp = NEXT_FREE(bp)) {
+    for (block_ptr = free_list_ptr; get_is_alloc(get_header(block_ptr)) == 0; block_ptr = NEXT_FREE(block_ptr)) {
         if (size <= get_size(get_header(block_ptr))) 
         return block_ptr; 
     }
