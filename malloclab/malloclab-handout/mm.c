@@ -127,23 +127,6 @@ static void allocate(void* block_ptr, size_t size){
     void *ptr;
     void *new_block_ptr; 
     size_t total_size = get_size(block_ptr);
-    if(total_size >= size + BLOCKSIZE){  
-        DEREF(get_header(block_ptr)) = size | 1;
-        DEREF(get_footer(block_ptr)) = size | 1; 
-        remove_block_from_free_list(block_ptr);
-        ptr = block_ptr + get_size(block_ptr);
-        DEREF(get_header(ptr)) = (total_size - size) | 0;
-        DEREF(get_footer(ptr)) = (total_size - size) | 0;
-    }
-    else{
-        ptr = get_header(block_ptr);
-        DEREF(ptr) = BLOCKSIZE | 1;
-        ptr = get_footer(block_ptr);
-        DEREF(ptr) = BLOCKSIZE | 1;
-        remove_block_from_free_list(block_ptr);
-    }
-
-    size_t total_size = get_size(block_ptr);
      if(total_size >= size + BLOCKSIZE){
          DEREF(get_header(block_ptr)) = size | 1;
          DEREF(get_footer(block_ptr)) = size | 1;
