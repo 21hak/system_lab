@@ -28,7 +28,6 @@
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 #define INIT_SIZE 16
 #define BLOCKSIZE 16
-#define WORDSIZE 4
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 #define DEREF(p) (*(size_t*)(p))
 #define NEXT_FREE(block_ptr) (*(void **)block_ptr)
@@ -37,18 +36,17 @@
 
 #define MINBLOCKSIZE 16
 #define INITSIZE      16 
-#define DSIZE             8 
-#define WSIZE             4 
+#define WORDSIZE       4 
 #define PACK(size, alloc) ((size) | (alloc))
 #define GET(p)        (*(size_t *)(p))
 #define PUT(p, val)   (*(size_t *)(p) = (val))
 #define GET_SIZE(p)  (GET(p) & ~0x1)
 #define GET_ALLOC(p) (GET(p) & 0x1)
-#define HDRP(bp)     ((void *)(bp) - WSIZE)
-#define FTRP(bp)     ((void *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+#define HDRP(bp)     ((void *)(bp) - WORDSIZE)
+#define FTRP(bp)     ((void *)(bp) + GET_SIZE(HDRP(bp)) - 2*WORDSIZE)
 
 #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
-#define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WSIZE))
+#define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WORDSIZE))
 
 /* 
  * mm_init - initialize the malloc package.
@@ -376,16 +374,16 @@ int mm_init(void)
   if ((heap_listp = mem_sbrk(INITSIZE + MINBLOCKSIZE)) == (void *)-1)
       return -1; 
   PUT(heap_listp,             PACK(MINBLOCKSIZE, 1));           // Prologue header 
-  PUT(heap_listp +    WSIZE,  PACK(MINBLOCKSIZE, 0));           // Free block header 
+  PUT(heap_listp +    WORDSIZE,  PACK(MINBLOCKSIZE, 0));           // Free block header 
 
-  PUT(heap_listp + (2*WSIZE), PACK(0,0));                       // Space for next pointer 
-  PUT(heap_listp + (3*WSIZE), PACK(0,0));                       // Space for prev pointer 
+  PUT(heap_listp + (2*WORDSIZE), PACK(0,0));                       // Space for next pointer 
+  PUT(heap_listp + (3*WORDSIZE), PACK(0,0));                       // Space for prev pointer 
   
-  PUT(heap_listp + (4*WSIZE), PACK(MINBLOCKSIZE, 0));           // Free block footer 
-  PUT(heap_listp + (5*WSIZE), PACK(0, 1));                      // Epilogue header 
+  PUT(heap_listp + (4*WORDSIZE), PACK(MINBLOCKSIZE, 0));           // Free block footer 
+  PUT(heap_listp + (5*WORDSIZE), PACK(0, 1));                      // Epilogue header 
 
   // Point free_list to the first header of the first free block
-  free_listp = heap_listp + (WSIZE);
+  free_listp = heap_listp + (WORDSIZE);
 
   return 0;
 }
@@ -413,7 +411,7 @@ void *mm_malloc(size_t size)
   /* The size of the new block is equal to the size of the header and footer, plus
    * the size of the payload. Or MINBLOCKSIZE if the requested size is smaller.
    */
-  asize = MAX(ALIGN(size) + DSIZE, MINBLOCKSIZE);
+  asize = MAX(ALIGN(size) + 2*WORDSIZE, MINBLOCKSIZE);
   
   // Search the free list for the fit 
   if ((bp = find_fit(asize))) {
@@ -423,7 +421,7 @@ void *mm_malloc(size_t size)
 
   // Otherwise, no fit was found. Grow the heap larger. 
   extendsize = MAX(asize, MINBLOCKSIZE);
-  if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
+  if ((bp = extend_heap(extendsize/WORDSIZE)) == NULL)
     return NULL;
 
   // Place the newly allocated block
@@ -474,7 +472,7 @@ void *mm_realloc(void *ptr, size_t size)
     
   /* Otherwise, we assume ptr is not NULL and was returned by an earlier malloc or realloc call.
    * Get the size of the current payload */
-  size_t asize = MAX(ALIGN(size) + DSIZE, MINBLOCKSIZE);
+  size_t asize = MAX(ALIGN(size) + 2*WORDSIZE, MINBLOCKSIZE);
   size_t current_size = GET_SIZE(HDRP(ptr));
 
   void *bp;
@@ -546,7 +544,7 @@ static void *extend_heap(size_t words)
 
   /* Adjust the size so the alignment and minimum block size requirements
    * are met. */ 
-  asize = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+  asize = (words % 2) ? (words + 1) * WORDSIZE : words * WORDSIZE;
   if (asize < MINBLOCKSIZE)
     asize = MINBLOCKSIZE;
   
@@ -716,7 +714,7 @@ static void place(void *bp, size_t asize)
 //   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
 
 //     char *prev = PREV_FREE(HDRP(next));
-//       if(prev != NULL && HDRP(next) - FTRP(prev) == DSIZE) {
+//       if(prev != NULL && HDRP(next) - FTRP(prev) == 2*WORDSIZE) {
 //         printf("Consistency error: block %p missed coalescing!", next);
 //         return 1;
 //       }
