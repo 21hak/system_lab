@@ -45,7 +45,7 @@
 #define HDRP(bp)     ((void *)(bp) - WORDSIZE)
 #define FTRP(bp)     ((void *)(bp) + GET_SIZE(HDRP(bp)) - 2*WORDSIZE)
 
-#define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
+// #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
 #define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WORDSIZE))
 
 /* 
@@ -73,7 +73,7 @@ static inline void* get_footer(void* block_ptr){
 }
 
 static inline void* get_next_block(void* block_ptr){
-    return ((void *)(block_ptr) + get_size(get_header(block_ptr)));
+    return ((void *)(block_ptr) + GET_SIZE(HDRP(block_ptr)));
 }
 
 static inline void* get_prev_block(void* block_ptr){
@@ -476,7 +476,7 @@ void *mm_realloc(void *ptr, size_t size)
   size_t current_size = GET_SIZE(HDRP(ptr));
 
   void *bp;
-  char *next = HDRP(NEXT_BLKP(ptr));
+  char *next = HDRP(get_next_block(ptr));
   size_t newsize = current_size + GET_SIZE(next);
 
   /* Case 1: Size is equal to the current payload size */
@@ -490,7 +490,7 @@ void *mm_realloc(void *ptr, size_t size)
 
       PUT(HDRP(ptr), PACK(asize, 1));
       PUT(FTRP(ptr), PACK(asize, 1));
-      bp = NEXT_BLKP(ptr);
+      bp = get_next_block(ptr);
       PUT(HDRP(bp), PACK(current_size - asize, 1));
       PUT(FTRP(bp), PACK(current_size - asize, 1));
       mm_free(bp);
@@ -513,10 +513,10 @@ void *mm_realloc(void *ptr, size_t size)
     if ( !GET_ALLOC(next) && newsize >= asize ) {
 
       // merge, split, and release
-      remove_freeblock(NEXT_BLKP(ptr));
+      remove_freeblock(get_next_block(ptr));
       PUT(HDRP(ptr), PACK(asize, 1));
       PUT(FTRP(ptr), PACK(asize, 1));
-      bp = NEXT_BLKP(ptr);
+      bp = get_next_block(ptr);
       PUT(HDRP(bp), PACK(newsize-asize, 1));
       PUT(FTRP(bp), PACK(newsize-asize, 1));
       mm_free(bp);
@@ -556,7 +556,7 @@ static void *extend_heap(size_t words)
    * push the epilogue header to the back */
   PUT(HDRP(bp), PACK(asize, 0));
   PUT(FTRP(bp), PACK(asize, 0));
-  PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* Move the epilogue to the end */
+  PUT(HDRP(get_next_block(bp)), PACK(0, 1)); /* Move the epilogue to the end */
 
   // Coalesce any partitioned free memory 
   return coalesce(bp); 
@@ -615,7 +615,7 @@ static void *coalesce(void *bp)
 {
   // Determine the current allocation state of the previous and next blocks 
   size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))) || PREV_BLKP(bp) == bp;
-  size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+  size_t next_alloc = GET_ALLOC(HDRP(get_next_block(bp)));
 
   // Get the size of the current free block
   size_t size = GET_SIZE(HDRP(bp));
@@ -623,8 +623,8 @@ static void *coalesce(void *bp)
   /* If the next block is free, then coalesce the current block
    * (bp) and the next block */
   if (prev_alloc && !next_alloc) {           // Case 2 (in text) 
-    size += GET_SIZE(HDRP(NEXT_BLKP(bp)));  
-    remove_freeblock(NEXT_BLKP(bp));
+    size += GET_SIZE(HDRP(get_next_block(bp)));  
+    remove_freeblock(get_next_block(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
   }
@@ -643,9 +643,9 @@ static void *coalesce(void *bp)
    * both */
   else if (!prev_alloc && !next_alloc) {     // Case 4 (in text) 
     size += GET_SIZE(HDRP(PREV_BLKP(bp))) + 
-            GET_SIZE(HDRP(NEXT_BLKP(bp)));
+            GET_SIZE(HDRP(get_next_block(bp)));
     remove_freeblock(PREV_BLKP(bp));
-    remove_freeblock(NEXT_BLKP(bp));
+    remove_freeblock(get_next_block(bp));
     bp = PREV_BLKP(bp);
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -682,7 +682,7 @@ static void place(void *bp, size_t asize)
     PUT(HDRP(bp), PACK(asize, 1));
     PUT(FTRP(bp), PACK(asize, 1));
     remove_freeblock(bp);
-    bp = NEXT_BLKP(bp);
+    bp = get_next_block(bp);
     PUT(HDRP(bp), PACK(fsize-asize, 0));
     PUT(FTRP(bp), PACK(fsize-asize, 0));
     coalesce(bp);
@@ -730,7 +730,7 @@ static void place(void *bp, size_t asize)
 //   }
 
 //   // Do the pointers in a heap block point to a valid heap address?
-//   for (next = heap_listp; NEXT_BLKP(next) != NULL; next = NEXT_BLKP(next)) {
+//   for (next = heap_listp; get_next_block(next) != NULL; next = get_next_block(next)) {
 
 //     if(next < mem_heap_lo() || next > mem_heap_hi()) {
 //       printf("Consistency error: block %p outside designated heap space", next);
