@@ -92,10 +92,10 @@ int mm_init(void)
     if ((free_list_ptr = mem_sbrk(INIT_SIZE + BLOCKSIZE)) == (void *)-1)
         return -1; 
     // DEREF(heap_list_ptr) = (BLOCKSIZE | 1);           // Prologue header 
-    DEREF(heap_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
-    DEREF(heap_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
-    DEREF(heap_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
-    DEREF(heap_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
+    DEREF(free_list_ptr + WORDSIZE)=  (BLOCKSIZE | 0);           // Free block header 
+    DEREF(free_list_ptr + (2*WORDSIZE))= (0 | 0);                       // Space for next pointer 
+    DEREF(free_list_ptr + (3*WORDSIZE))= (0 | 0);                       // Space for prev pointer 
+    DEREF(free_list_ptr + (4*WORDSIZE))= (BLOCKSIZE | 0);           // Free block footer 
     // DEREF(heap_list_ptr + (5*WORDSIZE))= (0 |  1);                      // Epilogue header 
     free_list_ptr = free_list_ptr + WORDSIZE;
     // free_list_ptr = heap_list_ptr + (WORDSIZE);
